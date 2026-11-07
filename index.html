@@ -264,7 +264,7 @@ $('#measBtn').onclick=()=>{S.mode=S.mode=='meas'?'sel':'meas';S.mp=null;S.hv=nul
 $('#measClr').onclick=()=>{S.meas=[];S.mp=null;S.hv=null;draw()};
 function zoomAt(z,cx,cy){z=Math.max(.3,Math.min(8,z));const r=stage.getBoundingClientRect(),px=(cx-r.left)/S.zoom,py=(cy-r.top)/S.zoom;S.zoom=z;zoom();const r2=stage.getBoundingClientRect();wrap.scrollLeft+=r2.left+px*z-cx;wrap.scrollTop+=r2.top+py*z-cy;$('#zm').value=z}
 $('#zm').oninput=e=>{const r=wrap.getBoundingClientRect();zoomAt(+e.target.value,r.left+r.width/2,r.top+r.height/2)};
-wrap.addEventListener('wheel',e=>{if(e.ctrlKey||e.metaKey){e.preventDefault();zoomAt(S.zoom*Math.exp(-e.deltaY*(e.deltaMode?.05:.0025)),e.clientX,e.clientY)}},{passive:false});
+wrap.addEventListener('wheel',e=>{if(!e.shiftKey&&!e.altKey){e.preventDefault();zoomAt(S.zoom*Math.exp(-e.deltaY*(e.deltaMode?.05:.0025)),e.clientX,e.clientY)}},{passive:false});
 let pz=null;const tc=e=>{const[a,b]=e.touches;return{d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)||1,x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}};
 wrap.addEventListener('touchstart',e=>{if(e.touches.length==2){pz={...tc(e),z:S.zoom};S.drag=null;e.preventDefault()}},{passive:false});
 wrap.addEventListener('touchmove',e=>{if(pz&&e.touches.length==2){const c=tc(e);wrap.scrollLeft-=c.x-pz.x;wrap.scrollTop-=c.y-pz.y;zoomAt(pz.z*c.d/pz.d,c.x,c.y);pz.x=c.x;pz.y=c.y;e.preventDefault()}},{passive:false});
@@ -349,7 +349,7 @@ for(const it of S.items){const on=sel&&it.id==S.sel;
 if(it.k=='g'){hw+=window.gSvg(it,on);if(on)ht+=window.gHdl(it);continue}if(it.k=='w'){hw+=window.wSvg(it,on);if(on)ht+=window.wHdl(it);continue}if(it.k=='n'){hn+=annSvg(it,on);if(on)ht+=annHdl(it);continue}
 if(it.k=='i'){if(it.front)hf+=imgSvg(it,on);else hb+=imgSvg(it,on);if(on)ht+=imgHdl(it);continue}
 if(it.k=='s'){h+=`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y})">${scafSvg(it)}${on?`<path d="M${it.pts.map(p=>p.x+' '+p.y).join('L')}Z" fill="none" stroke="#f59e0b" stroke-width="2.5" opacity=".7"/>`:''}</g>`;continue}
-if(it.k=='f'){hfe+=fenceSvg(it,on);if(on)ht+=fenceHdl(it);continue}if(it.t=='cone'){hc+=coneSvg(it,on);continue}if(it.tr&&it.tr.pts.length){htr+=trkSvg(it);if(on)ht+=trkHdl(it)}const w=it.l/m,hh=it.w/m;let o='';
+if(it.k=='f'){hfe+=fenceSvg(it,on);if(on)ht+=fenceHdl(it);continue}if(it.t=='cone'){hc+=coneSvg(it,on);if(on)ht+=coneHdl(it);continue}if(it.tr&&it.tr.pts.length){htr+=trkSvg(it);if(on)ht+=trkHdl(it)}const w=it.l/m,hh=it.w/m;if(on&&it.t=='guard')ht+=szHdl(it,w,hh,0,0);let o='';
 if(it.o){const ow=it.o[0]/m,oh=it.o[1]/m;o=`<rect x="${-ow/2}" y="${-oh/2}" width="${ow}" height="${oh}" fill="none" stroke="${it.c}" stroke-dasharray="4 2" stroke-width="1"/>`}
 h+=`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a})">${SYM[it.t]?`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="transparent"/>`:''}${o}${SYM[it.t]?symSvg(it,w,hh,on):'<g transform="scale(-1 1)">'+shape(it,w,hh,on)+'</g>'}<text transform="rotate(${-it.a})" font-size="8" text-anchor="middle" y="${SYM[it.t]?-hh/2-3:2.2}" fill="#111" paint-order="stroke" stroke="#fff" stroke-width="1.6">${it.name}</text>${radSvg(it,on)}${on?rotH(it,hh):''}</g>`}
 h=hb+htr+h+hf+hfe+coneLines()+hc+conePrev(sel)+fencePrev(sel)+hw+hn+(window.wPrev?window.wPrev(sel):'');if(S.mode=='scaf'&&S.pts.length)h+=`<polyline points="${S.pts.map(p=>p.x+','+p.y).join(' ')}" fill="none" stroke="#f59e0b" stroke-width="1.5"/>`+S.pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="#f59e0b"/>`).join('')+(S.pts.length>=3?`<circle cx="${S.pts[0].x}" cy="${S.pts[0].y}" r="9" fill="none" stroke="#f59e0b" stroke-dasharray="2 2"/>`:'');
@@ -363,11 +363,12 @@ if(S.mode=='fence'){if(e.pointerType=='mouse'&&e.button!=0)return;fencePt(e,p);i
 if(S.mode=='cone'){if(e.pointerType=='mouse'&&e.button==2)return;if(e.pointerType=='mouse'&&e.button!=0)return;conePt(e,p);if(e.pointerType!='mouse'){clearTimeout(S.lpT);S.lpOn=1;S.lp0={x:e.clientX,y:e.clientY};S.lpT=setTimeout(()=>{if(S.lpOn&&S.mode=='cone'){S.lpOn=0;if(navigator.vibrate)navigator.vibrate(20);coneEnd()}},650)}return}if(S.mode=='meas'){if(e.shiftKey)ortho(p,S.mp);if(!S.mp)S.mp=p;else{S.meas.push({a:S.mp,b:p});S.mp=null;S.hv=null}draw();return}
 if(S.mode=='cal'){if(S.cal.length>=2)S.cal=[];S.cal.push(p);if(S.cal.length==2)$('#calBox').style.display='';draw();return}
 if(window.wDown&&window.wDown(e,p))return;if(S.mode=='ann'){annDown(e,p);return}if(S.mode=='trk'&&!e.target.closest('[data-h]')){trkPt(p);return}
-if(S.mode=='piv'){const i0=S.items.find(i=>i.id==S.sel);if(i0)i0.pv=toLoc(i0,p);S.mode='sel';mode();props();return}const hd=e.target.closest('[data-h]'),g0=e.target.closest('[data-id]');if(hd&&g0){const i1=S.items.find(i=>i.id==g0.dataset.id);if(i1){if(S.sel!=i1.id){S.sel=i1.id;draw();props()}S.drag={it:i1,h:hd.dataset.h,s0:{x:i1.x,y:i1.y,w:i1.w,h:i1.h},g0:annSnap(i1),p0:p};sv.setPointerCapture(e.pointerId);return}}const g=e.target.closest('[data-id]');S.ss=null;if(g){const it=S.items.find(i=>i.id==g.dataset.id);S.sel=it.id;S.drag=it.k=='n'?{it,h:'an:mv',g0:annSnap(it),p0:p}:{it,dx:p.x-it.x,dy:p.y-it.y};sv.setPointerCapture(e.pointerId)}else{const sg=e.target.closest&&e.target.closest('[data-seg]');if(sg){coneSegDown(sg.dataset.seg,p,e);return}S.sel=null}draw();props()});
+if(S.mode=='piv'){const i0=S.items.find(i=>i.id==S.sel);if(i0)i0.pv=toLoc(i0,p);S.mode='sel';mode();props();return}const hd=e.target.closest('[data-h]'),g0=e.target.closest('[data-id]');if(hd&&g0){const i1=S.items.find(i=>i.id==g0.dataset.id);if(i1){if(S.sel!=i1.id){S.sel=i1.id;draw();props()}S.drag={it:i1,h:hd.dataset.h,s0:{x:i1.x,y:i1.y,w:i1.w,h:i1.h},s1:{l:i1.l,w:i1.w},g0:annSnap(i1),p0:p};sv.setPointerCapture(e.pointerId);return}}const g=e.target.closest('[data-id]');S.ss=null;if(g){const it=S.items.find(i=>i.id==g.dataset.id);S.sel=it.id;S.drag=it.k=='n'?{it,h:'an:mv',g0:annSnap(it),p0:p}:{it,dx:p.x-it.x,dy:p.y-it.y};sv.setPointerCapture(e.pointerId)}else{const sg=e.target.closest&&e.target.closest('[data-seg]');if(sg){coneSegDown(sg.dataset.seg,p,e);return}S.sel=null}draw();props()});
 let _raf=0;const drawRaf=()=>{if(_raf)return;_raf=requestAnimationFrame(()=>{_raf=0;draw()})};
 sv.addEventListener('pointermove',e=>{window.wMove&&window.wMove(e);if(S.mode=='meas'&&S.mp){S.hv=ortho(pt(e),e.shiftKey?S.mp:null);draw()}if(S.mode=='fence'&&S.fp&&S.fp.pts.length){const a=S.fp.pts[S.fp.pts.length-1];S.fv=ortho(pt(e),e.shiftKey?a:null);drawRaf();fenceInfo()}if(S.mode=='cone'&&S.cl){const a=conePos(S.cl.ids[S.cl.ids.length-1]);S.cv=ortho(pt(e),e.shiftKey&&a?a:null);draw();coneInfo()}const d=S.drag;if(!d)return;if(e.pointerType=='mouse'&&e.buttons==0){S.drag=null;return}const p=pt(e);if(d.sg){coneSegMove(d,p);return}const it=d.it;if(it.k=='g'&&d.h&&/^gv/.test(d.h)){window.gDrag(it,d,p);drawRaf();return}if(it.k=='w'&&d.h&&/^w[vl]/.test(d.h)){window.wDrag(it,d,p);drawRaf();return}if(it.k=='f'&&d.h&&/^f[vl]\d/.test(d.h)){fenceDrag(it,d,p);drawRaf();return}
 if(d.h=='rot'){let a=Math.atan2(p.y-it.y,p.x-it.x)*180/Math.PI+90;a=((a%360)+360)%360;if(e.shiftKey)a=Math.round(a/15)*15%360;else{const q=Math.round(a/90)*90;if(Math.abs(a-q)<3)a=q%360}it.a=Math.round(a*10)/10;const ai=document.querySelector('#props input[data-k=a]');if(ai)ai.value=it.a}else if(d.h&&d.h.startsWith('an:'))annDrag(it,d,p,e);else if(d.h=='new')annNew(d,p,e);else if(d.h=='p')it.pv=toLoc(it,p);
 else if(d.h&&d.h.startsWith('tp')){it.tr.pts[+d.h.slice(2)]=toLoc(it,p).map(v=>Math.round(v*10)/10)}
+else if(d.h&&d.h.startsWith('cz'))objResize(it,d,p,e.shiftKey);
 else if(d.h&&d.h.startsWith('sz'))imgResize(it,d,p,e.shiftKey);
 else if(d.h=='r'){const a=it.a*Math.PI/180,c=Math.cos(a),n=Math.sin(a),px=it.pv[0]/S.mpp,py=it.pv[1]/S.mpp,wx=it.x+px*c-py*n,wy=it.y+px*n+py*c;it.rad=Math.min(RMAX[it.t]||999,Math.max(1,Math.round(Math.hypot(p.x-wx,p.y-wy)*S.mpp*2)/2));const r=$('#rad');if(r)r.value=it.rad}
 else{it.x=p.x-d.dx;it.y=p.y-d.dy;if(it.t=='cone')coneBend(it)}drawRaf()});
@@ -388,7 +389,22 @@ const CB=24.5;
 function conePos(id){const c=S.items.find(i=>i.id==id);return c?{x:c.x,y:c.y}:null}
 // a→b を等分(間隔は設定値以内。+10%まで許容)した点列。aは含まず、bを含む
 function segPts(a,b){const d=Math.hypot(b.x-a.x,b.y-a.y),sp=Math.max(300,+$('#csp').value||2000),n=Math.max(1,Math.ceil(d*S.mpp*1000/sp-.1)),r=[];for(let i=1;i<=n;i++)r.push({x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n});return r}
-function mkCone(p){const t=T.find(t=>t[1]=='cone'),y=SYM.cone,it={id:S.uid++,k:'o',t:'cone',name:t[2],w:y.W,l:y.L,rad:0,pv:null,c:t[5],o:null,x:p.x,y:p.y,a:0};S.items.push(it);return it}
+// ---- ガードマン/カラーコーン: 四隅のハンドルでサイズ変更(縮尺と無関係に自由)
+function szHdl(it,w,hh,cx,cy){let s='';for(const[hx,hy,cu]of [[-1,-1,'nwse-resize'],[1,-1,'nesw-resize'],[1,1,'nwse-resize'],[-1,1,'nesw-resize']]){const X=cx+hx*w/2,Y=cy+hy*hh/2;s+=`<rect data-h="cz${hx},${hy}" x="${X-12}" y="${Y-12}" width="24" height="24" fill="transparent" style="cursor:${cu}"/><rect data-h="cz${hx},${hy}" x="${X-5}" y="${Y-5}" width="10" height="10" fill="#fff" stroke="#f59e0b" stroke-width="1.6" style="cursor:${cu}"/>`}
+return `<g data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a||0})">${s}</g>`}
+function coneHdl(it){const y=SYM.cone,m=S.mpp,w=it.l/m,hh=it.w/m,by=(CB-y.h/2)*(hh/y.h);return szHdl(it,w+4,hh+4,0,-by)}
+function coneGroup(it){const L=S.lines.filter(l=>l.ids.includes(it.id)),ids=new Set(L.flatMap(l=>l.ids));ids.add(it.id);return S.items.filter(i=>ids.has(i.id)&&i.t=='cone')}
+function objResize(it,d,p,free){const[hx,hy]=d.h.slice(2).split(',').map(Number),s=d.s0,s1=d.s1,m=S.mpp,MIN=3,r3=v=>Math.round(v*1000)/1000;
+ if(it.t=='cone'){const y=SYM.cone,w0=s1.l/m,h0=s1.w/m,by=(CB-y.h/2)*(h0/y.h),px=p.x-s.x,py=p.y-s.y+by;
+  const k=Math.max(.05,Math.max(Math.abs(px)/(w0/2),Math.abs(py)/(h0/2)));
+  const nl=r3(Math.max(MIN*m,s1.l*k)),nw=r3(Math.max(MIN*m*y.h/y.w,s1.w*k));coneGroup(it).forEach(c=>{c.l=nl;c.w=nw})}
+ else{const a=(it.a||0)*Math.PI/180,c=Math.cos(a),n=Math.sin(a),w0=s1.l/m,h0=s1.w/m,dx=p.x-s.x,dy=p.y-s.y,lx=dx*c+dy*n,ly=-dx*n+dy*c;
+  let nw=Math.max(MIN,(lx+hx*w0/2)*hx),nh=Math.max(MIN,(ly+hy*h0/2)*hy);
+  if(!free){const k=Math.max(nw/w0,nh/h0);nw=Math.max(MIN,w0*k);nh=nw*h0/w0}
+  const cx=-hx*w0/2+hx*nw/2,cy=-hy*h0/2+hy*nh/2;
+  it.l=r3(nw*m);it.w=r3(nh*m);it.x=s.x+cx*c-cy*n;it.y=s.y+cx*n+cy*c}
+ const li=document.querySelector('#props input[data-k=l]'),wi=document.querySelector('#props input[data-k=w]');if(li)li.value=it.l;if(wi)wi.value=it.w}
+function mkCone(p){const t=T.find(t=>t[1]=='cone'),y=SYM.cone,rf=[...S.items].reverse().find(i=>i.t=='cone'),it={id:S.uid++,k:'o',t:'cone',name:t[2],w:rf?rf.w:y.W,l:rf?rf.l:y.L,rad:0,pv:null,c:t[5],o:null,x:p.x,y:p.y,a:0};S.items.push(it);return it}
 // 位置(x,y)=コーン台座の中心(接地点)。文字は表示しない
 function coneSvg(it,on){const y=SYM.cone,m=S.mpp,w=it.l/m,hh=it.w/m,sx=w/y.w,sy=hh/y.h,by=(CB-y.h/2)*sy;
 return `<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y})"><rect x="${-w/2}" y="${-by-hh/2}" width="${w}" height="${hh}" fill="transparent"/><g transform="translate(0 ${-by}) scale(${sx} ${sy}) translate(${-y.w/2} ${-y.h/2})"><use href="#s_cone"/></g>${on?`<rect x="${-w/2-2}" y="${-by-hh/2-2}" width="${w+4}" height="${hh+4}" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="5 3" pointer-events="none"/>`:''}</g>`}
@@ -432,7 +448,7 @@ const ps=cl.ids.map(conePos).filter(Boolean);let L=0;for(let i=1;i<ps.length;i++
 let t=`作図中:コーン${cl.ids.length}個 / 延長${Math.round(L*S.mpp*1000).toLocaleString()}mm`;
 if(S.cv&&ps.length){const a=ps[ps.length-1],d=Math.hypot(S.cv.x-a.x,S.cv.y-a.y)*S.mpp*1000,n=segPts(a,S.cv).length;if(d>0)t+=` / この区間${Math.round(d).toLocaleString()}mm→${n}分割(約${Math.round(d/n).toLocaleString()}mm間隔)`}
 el.textContent=t}
-function coneDelLine(){const it=S.items.find(i=>i.id==S.sel);if(!it)return;const L=S.lines.filter(l=>l.ids.includes(it.id)),ids=new Set(L.flatMap(l=>l.ids));S.items=S.items.filter(i=>!ids.has(i.id));S.lines=S.lines.filter(l=>!L.includes(l));S.sel=null;draw();props()}
+function coneDelLine(){const it=S.items.find(i=>i.id==S.sel);let L;if(it)L=S.lines.filter(l=>l.ids.includes(it.id));else if(S.ss)L=S.lines.filter(l=>l.id==S.ss.l);else return;const ids=new Set(L.flatMap(l=>l.ids));if(it)ids.add(it.id);S.items=S.items.filter(i=>!ids.has(i.id));S.lines=S.lines.filter(l=>!L.includes(l));S.sel=null;S.ss=null;draw();props()}
 $('#coneOk').onclick=coneEnd;$('#coneUndo').onclick=coneUndo;
 // ---- 仮囲い(オレンジネット/単管メッシュ/プラゲート)
 const FT={orange:{n:'オレンジネット',c:'#f97316',p:2000,ds:'5 3'},tube:{n:'単管メッシュ',c:'#16a34a',p:1800},plagate:{n:'プラゲート',c:'#2563eb',p:1500,ds:'10 3'},adflat:{n:'アドフラット(鋼板)',c:'#475569',p:2000,ds:'20 4'}};
@@ -560,9 +576,9 @@ Object.keys(FT).forEach(ft=>{const pe=$('#fp_'+ft),ce=$('#fc_'+ft);
  pe.onchange=ap;ce.oninput=ap});
 
 // ---- プロパティ・集計
-function props(){const it=S.items.find(i=>i.id==S.sel),P=$('#props');$('#pbox').style.display=it&&it.k!='n'?'block':'none';annUI();window.wUI&&window.wUI();if(!it||it.k=='n')return;if(it.k=='g'){window.gProps(it,P);return}if(it.k=='w'){window.wProps(it,P);return}if(it.k=='i'){propsImg(it,P);return}if(it.k=='f'){propsFence(it,P);return}
+function props(){const it=S.items.find(i=>i.id==S.sel),P=$('#props');$('#pbox').style.display=it&&it.k!='n'?'block':'none';annUI();window.wUI&&window.wUI();if(!it&&S.ss&&S.lines.some(l=>l.id==S.ss.l)){$('#pbox').style.display='block';P.innerHTML='<b>カラーコーン列</b><div class="row"><button id="bline">この列を全削除</button></div>';$('#bline').onclick=coneDelLine;return}if(!it||it.k=='n')return;if(it.k=='g'){window.gProps(it,P);return}if(it.k=='w'){window.wProps(it,P);return}if(it.k=='i'){propsImg(it,P);return}if(it.k=='f'){propsFence(it,P);return}
 const inp=(k,l,st='any')=>`${l}<input type="number" step="${st}" data-k="${k}" value="${it[k]}">`;
-P.innerHTML=`<b>${it.name}</b><div class="row">`+(it.k=='s'?inp('gap','離隔','0.05')+inp('wid','幅','0.05')+inp('lift','段高','0.1')+inp('h','高さ','0.5'):inp('l','長さm','0.1')+inp('w','幅m','0.1')+(it.t=='cone'?'':inp('a','角度°','5')))+`</div>`+(PIV.has(it.t)&&it.pv?`<div class="row">作業半径<input id="rad" type="number" step="0.5" min="0" data-k="rad" value="${it.rad}" max="${RMAX[it.t]||''}" placeholder="${DR[it.t]}">m<button id="bpv" ${it.pvEdit?'':'hidden'}>旋回軸を指定</button></div><div class="row"><label><input type="checkbox" id="pvedit" style="width:auto" ${it.pvEdit?'checked':''}> 旋回軸の位置を調整する(通常は車両に固定)</label></div><div class="small">半径を入力(${RMAX[it.t]?'最大'+RMAX[it.t]+'m':'目安'+DR[it.t]+'m'})→円を表示。円は車両に固定され、車両の移動・回転に追従します。円の線(縁)をドラッグすると半径が伸び縮みします(ポンプ車は灰色の点線=最大半径まで)。旋回軸の位置を直すときだけ下のチェックを入れてください。赤丸のドラッグで半径変更(0で非表示)。</div>`:'')+`<div class="row"><button id="b90"${it.t=='cone'?' hidden':''}>90°回転</button><button id="bdup">複製</button><button id="bdel">削除</button>${S.lines.some(l=>l.ids.length>1&&l.ids.includes(it.id))?'<button id="bline">この列を全削除</button>':''}</div>`;
+P.innerHTML=`<b>${it.name}</b><div class="row">`+(it.k=='s'?inp('gap','離隔','0.05')+inp('wid','幅','0.05')+inp('lift','段高','0.1')+inp('h','高さ','0.5'):inp('l','長さm','0.1')+inp('w','幅m','0.1')+(it.t=='cone'?'':inp('a','角度°','5')))+`</div>`+(PIV.has(it.t)&&it.pv?`<div class="row">作業半径<input id="rad" type="number" step="0.5" min="0" data-k="rad" value="${it.rad}" max="${RMAX[it.t]||''}" placeholder="${DR[it.t]}">m<button id="bpv" ${it.pvEdit?'':'hidden'}>旋回軸を指定</button></div><div class="row"><label><input type="checkbox" id="pvedit" style="width:auto" ${it.pvEdit?'checked':''}> 旋回軸の位置を調整する(通常は車両に固定)</label></div><div class="small">半径を入力(${RMAX[it.t]?'最大'+RMAX[it.t]+'m':'目安'+DR[it.t]+'m'})→円を表示。円は車両に固定され、車両の移動・回転に追従します。円の線(縁)をドラッグすると半径が伸び縮みします(ポンプ車は灰色の点線=最大半径まで)。旋回軸の位置を直すときだけ下のチェックを入れてください。赤丸のドラッグで半径変更(0で非表示)。</div>`:'')+`<div class="row"><button id="b90"${it.t=='cone'?' hidden':''}>90°回転</button><button id="bdup">複製</button><button id="bdel">削除</button>${it.t=='cone'?'<button id="bline">この列を全削除</button>':''}</div>`;
 P.querySelectorAll('input').forEach(i=>i.onchange=()=>{let v=+i.value;if(it.pv&&(i.dataset.k=='l'||i.dataset.k=='w')&&it[i.dataset.k]>0&&v>0){it.pv[i.dataset.k=='l'?0:1]*=v/it[i.dataset.k]}if(i.dataset.k=='rad'&&RMAX[it.t]&&v>RMAX[it.t]){v=RMAX[it.t];i.value=v}it[i.dataset.k]=v;draw()});
 trkProps(it,P);$('#b90').onclick=()=>{if(it.k=='o'&&it.t!='cone'){it.a=(it.a+90)%360;draw();props()}};$('#bdel').onclick=del;if($('#bline'))$('#bline').onclick=coneDelLine;if($('#bpv'))$('#bpv').onclick=()=>{S.mode='piv';mode()};if($('#pvedit'))$('#pvedit').onchange=e=>{it.pvEdit=e.target.checked;draw();props()};
 $('#bdup').onclick=()=>{const c=JSON.parse(JSON.stringify(it));c.id=S.uid++;c.x+=15;c.y+=15;S.items.push(c);S.sel=c.id;draw();props()}}
@@ -1232,6 +1248,7 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
   </span>
   <span class="rdg" id="rdv2" hidden>
    <label><input type="checkbox" id="rdoName" checked>施設名を表示</label>
+   <label title="Google Mapsの施設名を反映する場合のみ入力(Places API (New) のキー。ブラウザ内にのみ保存)">Google APIキ&#x30FC;<input type="password" id="rdGkey" style="width:110px" placeholder="任意"></label>
    <label><input type="checkbox" id="rdoNorth" checked>方位を表示</label>
    <label><input type="checkbox" id="rdoFill" checked>建物を塗る</label>
    <label><input type="checkbox" id="rdoScale" checked>縮尺を表示</label>
@@ -1641,7 +1658,9 @@ function rlVectorize(rgba,W,H,F,o){
   rlPrune(G,W,H,Math.round((o.minG||10)*F),{tw:Math.round((o.tw||16)*F),tr:o.tr||1.9});rlPrune(O,W,H,Math.round((o.minO||7)*F),{tw:Math.round((o.twO||12)*F),tr:0,both:1});
   const spur=Math.round((o.spur||1.6)*F),lines=[];
   const mk=(m,kind)=>{for(const p of rlTrace(m,W,H,spur)){if(p.length<2)continue;
-      let q=rlFair(p,F);
+      let q;
+      if(kind==='bld'){q=rlRdp(p,Math.max(1.8,1.7*F));if(q.length>=3&&Math.hypot(q[0][0]-q[q.length-1][0],q[0][1]-q[q.length-1][1])<5*F)q[q.length-1]=[q[0][0],q[0][1]]}
+      else q=rlFair(p,F);
       let dk=0,c=0;for(let t=0;t<p.length;t+=2){const x=Math.round(p[t][0]-.5),y=Math.round(p[t][1]-.5);let mnv=255;
         for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<W&&yy<H){const v=V[yy*W+xx];if(v<mnv)mnv=v}}dk+=mnv;c++}
       lines.push({pts:q,k:kind,dk:c?dk/c:255,len:p.length})}};
@@ -1685,19 +1704,54 @@ async function fetchImg(g){
   if(!r.lines.length)throw new Error('線を検出できませんでした');
   const lines=r.lines.map(l=>({k:l.k==='g'?'edge':l.k,pts:l.pts.map(p=>[x0+p[0]/F,y0+p[1]/F])}));
   // 建物の塗り(輪郭の内側)。解像度を落として保持
-  const fw=Math.min(W,cw*6),fh=Math.min(H,ch*6),c0=document.createElement('canvas');c0.width=W;c0.height=H;
-  const f0=c0.getContext('2d'),fi=f0.createImageData(W,H),fd=fi.data,FLm=r.fill;
-  for(let i=0,j=0;i<FLm.length;i++,j+=4)if(FLm[i]){fd[j]=fd[j+1]=fd[j+2]=241;fd[j+3]=255}
-  f0.putImageData(fi,0,0);
-  const fc=document.createElement('canvas');fc.width=fw;fc.height=fh;const f1=fc.getContext('2d');f1.imageSmoothingEnabled=true;f1.imageSmoothingQuality='high';f1.drawImage(c0,0,0,W,H,0,0,fw,fh);{const b=f1.getImageData(0,0,fw,fh),bd=b.data;for(let j=0;j<bd.length;j+=4){if(bd[j+3]>=128){bd[j]=bd[j+1]=bd[j+2]=241;bd[j+3]=255}else bd[j+3]=0}f1.putImageData(b,0,0)}
-  c0.width=c0.height=1;c2.width=c2.height=1;
+  const fw=Math.min(W,cw*6),fh=Math.min(H,ch*6),fc=document.createElement('canvas');fc.width=fw;fc.height=fh;const f1=fc.getContext('2d');
+  // 塗りは直線化した建物輪郭(閉じたもの)から作る → 線と塗りが一致する
+  let npoly=0;f1.fillStyle='rgb(241,241,241)';
+  for(const l of r.lines){if(l.k!=='bld'||l.pts.length<4)continue;const a=l.pts[0],b=l.pts[l.pts.length-1];if(Math.hypot(a[0]-b[0],a[1]-b[1])>6*F)continue;
+    f1.beginPath();l.pts.forEach((pt,i)=>{const x=pt[0]/F*fw/cw,y=pt[1]/F*fh/ch;i?f1.lineTo(x,y):f1.moveTo(x,y)});f1.closePath();f1.fill();npoly++}
+  if(!npoly){const c0=document.createElement('canvas');c0.width=W;c0.height=H;
+   const f0=c0.getContext('2d'),fi=f0.createImageData(W,H),fd=fi.data,FLm=r.fill;
+   for(let i=0,j=0;i<FLm.length;i++,j+=4)if(FLm[i]){fd[j]=fd[j+1]=fd[j+2]=241;fd[j+3]=255}
+   f0.putImageData(fi,0,0);f1.drawImage(c0,0,0,W,H,0,0,fw,fh);c0.width=c0.height=1}
+  c2.width=c2.height=1;
   g.imgz=z;g.nl=lines.length;
   return{type:'rimg',z,n,x0,y0,cw,ch,lines,fill:fc}}
+
+// ---- 施設名の取得(OSMを長めの待ち時間+再試行/地理院注記/Google Places(任意))
+const GKEYN='kasetsu.gkey';
+function gKey(){try{return (localStorage.getItem(GKEYN)||'').trim()}catch(e){return ''}}
+async function fetchGoogleNames(g){
+ const key=gKey();if(!key)return[];
+ const B=gbox(g),mLat=111320,mLon=111320*Math.cos(rad(g.lat0));
+ const hh=(B.n-B.s)*mLat,ww=(B.e-B.w)*mLon,nx=Math.min(5,Math.max(1,Math.ceil(ww/180))),ny=Math.min(5,Math.max(1,Math.ceil(hh/180)));
+ const jobs=[];
+ for(let iy=0;iy<ny;iy++)for(let ix=0;ix<nx;ix++){
+  const lat=B.s+(B.n-B.s)*(iy+.5)/ny,lon=B.w+(B.e-B.w)*(ix+.5)/nx,rad0=Math.min(50000,Math.hypot(ww/nx,hh/ny)/2*1.05);
+  jobs.push(fetch('https://places.googleapis.com/v1/places:searchNearby',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':key,'X-Goog-FieldMask':'places.displayName,places.location'},
+   body:JSON.stringify({maxResultCount:20,languageCode:'ja',regionCode:'JP',locationRestriction:{circle:{center:{latitude:lat,longitude:lon},radius:rad0}}})})
+   .then(async r=>{const j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||('HTTP '+r.status));return j.places||[]}))}
+ const res=await Promise.allSettled(jobs),out=[];let err=null;
+ for(const r of res){if(r.status==='fulfilled'){for(const p of r.value){const nm=p.displayName&&p.displayName.text;if(nm&&p.location)out.push({type:'node',lat:p.location.latitude,lon:p.location.longitude,tags:{name:nm,gmap:'1'}})}}else err=r.reason}
+ if(!out.length&&err)throw err;
+ return out}
+async function fetchAllNames(g){
+ const to=(pr,ms)=>Promise.race([pr,new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),ms))]);
+ let osm=[],anno=[],gm=[],msg='';
+ const jOsm=(async()=>{for(let k=0;k<2;k++){try{return await to(fetchNames(g),30000)}catch(e){}}return[]})();
+ const jAnno=(async()=>{try{return (await to(fetchGsi(g),30000)).filter(e=>e.tags&&e.tags.gsiAnno)}catch(e){return[]}})();
+ const jG=(async()=>{try{return await to(fetchGoogleNames(g),30000)}catch(e){msg=' / Google取得失敗:'+(e&&e.message||e);return[]}})();
+ [osm,anno,gm]=await Promise.all([jOsm,jAnno,jG]);
+ const out=[],seen=[];const near=(a,b)=>Math.abs(a.lat-b.lat)<.00025&&Math.abs(a.lon-b.lon)<.0003;
+ const add=e=>{const nm=e.tags&&e.tags.name;if(!nm)return;if(seen.some(s=>s.n===nm&&near(s,e)))return;seen.push({n:nm,lat:e.lat,lon:e.lon});out.push(e)};
+ gm.forEach(add);
+ osm.filter(e=>!(e.tags&&e.tags.footway==='sidewalk')).forEach(e=>{if(e.type==='node')add(e);else out.push(e)});
+ anno.forEach(add);
+ g.nmCount=seen.length;g.nmMsg=msg;return out}
 async function fetchBase(g){
  if(q('#rdsrc').value==='img'){
   try{const ri=await fetchImg(g),els=[ri];g.src='img';g.nm=false;
    st('施設名を取得中…');
-   try{const nm=await Promise.race([fetchNames(g),new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),12000))]);const keep=nm.filter(e=>!(e.tags&&e.tags.footway==='sidewalk'));if(keep.length){els.push(...keep);g.nm=true}}catch(e){}
+   try{const keep=await fetchAllNames(g);if(keep.length){els.push(...keep);g.nm=true}st('施設名 '+(g.nmCount||0)+' 件を取得'+(g.nmMsg||''))}catch(e){st('施設名の取得に失敗しました')}
    return els}
   catch(e){st('標準地図の画像変換ができなかったため('+(e&&e.message||e)+')、国土地理院ベクトルで作成します…','err')}}
  if(q('#rdsrc').value==='gsi'||q('#rdsrc').value==='img'){
@@ -1985,11 +2039,12 @@ function sheetCanvas(K,ui){
 var PZ=1;
 function pvFit(){const v=q('#rdpv'),c=q('#rdcv');c.classList.remove('fitr');const bw=md==='P'?595.28:A3W,bh=md==='P'?841.89:A3H,aw=Math.max(50,v.clientWidth-24),ah=Math.max(50,v.clientHeight-24),k=Math.min(aw/bw,ah/bh)*PZ;c.style.width=(bw*k)+'px';c.style.height=(bh*k)+'px';q('#rdzv').textContent=Math.round(PZ*100)+'%'}
 function drawSheetPreview(msg){const c=q('#rdcv'),s=sheetCanvas(PZ>1.6?4:2,true);c.width=s.width;c.height=s.height;c.getContext('2d').drawImage(s,0,0);pvFit();if(msg)st(msg,'ok')}
-function pvZoom(nz,cx,cy){nz=Math.min(8,Math.max(1,nz));if(nz===PZ)return;const v=q('#rdpv'),c=q('#rdcv'),r=c.getBoundingClientRect(),vr=v.getBoundingClientRect();
+function pvZoom(nz,cx,cy){nz=Math.min(8,Math.max(.3,nz));if(Math.abs(nz-PZ)<1e-4)return;const v=q('#rdpv'),c=q('#rdcv'),r=c.getBoundingClientRect(),vr=v.getBoundingClientRect();
  if(cx==null){cx=vr.left+vr.width/2;cy=vr.top+vr.height/2}
  const fx=(cx-r.left)/r.width,fy=(cy-r.top)/r.height,oldHi=PZ>1.6,old=PZ;PZ=nz;pvFit();
  const r2=c.getBoundingClientRect();v.scrollLeft+=(r2.left+fx*r2.width)-cx;v.scrollTop+=(r2.top+fy*r2.height)-cy;
  if((PZ>1.6)!==oldHi&&stg===2){if(md==='P')drawSheetPreview();else renderPreview()}}
+(function(){const gk=q('#rdGkey');if(gk){gk.value=gKey();gk.addEventListener('change',()=>{try{localStorage.setItem(GKEYN,gk.value.trim())}catch(e){}})}})();
 (function(){const v=q('#rdpv');
  v.addEventListener('wheel',e=>{if(stg!==2)return;e.preventDefault();pvZoom(PZ*(e.deltaY<0?1.15:1/1.15),e.clientX,e.clientY)},{passive:false});
  q('#rdzi').onclick=()=>pvZoom(PZ*1.25);q('#rdzo').onclick=()=>pvZoom(PZ/1.25);q('#rdzf').onclick=()=>pvZoom(1);
