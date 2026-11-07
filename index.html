@@ -1235,6 +1235,9 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
    <label><input type="checkbox" id="rdoFill" checked>建物を塗る</label>
    <label><input type="checkbox" id="rdoScale" checked>縮尺を表示</label>
    <label><input type="checkbox" id="rdoRoad" checked>道路線</label>
+   <label title="歩道の帯を描きます。OSM情報=地図データに歩道の記載がある道路のみ。推定を含める=幹線道路(国道・県道・主要市道)は両側に歩道があるものとして描きます">歩道<select id="rdoSw"><option value="est" selected>OSM+推定</option><option value="osm">OSM情報のみ</option><option value="none">なし</option></select></label>
+   <label><input type="checkbox" id="rdoZb" checked>横断歩道</label>
+   <label title="道路幅が実際と違うときに、車道の幅をまとめて増減します">車道幅<input type="number" id="rdoRs" value="100" min="50" max="200" step="5" style="width:56px">%</label>
    <label><input type="checkbox" id="rdoBld" checked>建物線</label>
    <label><input type="checkbox" id="rdoAttr" checked>出典表示</label>
    <button id="rdback">範囲を取り直す</button>
@@ -1406,20 +1409,36 @@ function roadW(t){const w=parseFloat(t.width);if(w>0)return Math.min(w,60);const
  const l=parseInt(t.lanes)||0;if(t.oneway==='yes'||t.oneway==='-1')return Math.max(3,l?l*3:b*.65);return l&&t.highway!=='service'?Math.max(b,l*3):b}
 function waterW(t){const w=parseFloat(t.width);if(w>0)return Math.min(w,80);return({river:14,canal:8,stream:1.5,ditch:1,drain:1})[t.waterway]||2}
 const POIX=new Set(['parking','parking_space','bench','shelter','bicycle_parking','vending_machine','waste_basket','atm','post_box','toilets','recycling']);
+// 折れ線を左(正)/右(負)へ平行移動(画面座標。進行方向に対し左=(dy,-dx))
+function offs(pts0,d){const pts=pts0.filter((p,i)=>!i||Math.hypot(p[0]-pts0[i-1][0],p[1]-pts0[i-1][1])>1e-6);if(pts.length<2)return pts;
+ const nr=(a,b)=>{const dx=b[0]-a[0],dy=b[1]-a[1],l=Math.hypot(dx,dy)||1;return[dy/l,-dx/l]},out=[];
+ for(let i=0;i<pts.length;i++){const n1=i>0?nr(pts[i-1],pts[i]):null,n2=i<pts.length-1?nr(pts[i],pts[i+1]):null;let nx,ny;
+  if(n1&&n2){nx=n1[0]+n2[0];ny=n1[1]+n2[1];const l=Math.hypot(nx,ny);if(l<1e-6){nx=n1[0];ny=n1[1]}else{nx/=l;ny/=l;const c=Math.max(.35,nx*n1[0]+ny*n1[1]);nx/=c;ny/=c}}
+  else{const n=n1||n2;nx=n[0];ny=n[1]}
+  out.push([pts[i][0]+nx*d,pts[i][1]+ny*d])}
+ return out}
+const SWEST=new Set(['trunk','primary','secondary','tertiary','trunk_link','primary_link','secondary_link']);
+function swSides(t,est){const v=x=>x&&x!=='no'&&x!=='none'&&x!=='separate';let L=false,Rr=false;
+ const b=t.sidewalk||'';if(b==='both'||b==='yes'){L=Rr=true}else if(b==='left')L=true;else if(b==='right')Rr=true;
+ if(v(t['sidewalk:both']))L=Rr=true;if(v(t['sidewalk:left']))L=true;if(v(t['sidewalk:right']))Rr=true;
+ if(est&&!L&&!Rr&&SWEST.has(t.highway)&&!b&&!t['sidewalk:both']&&!t['sidewalk:left']&&!t['sidewalk:right'])L=Rr=true;
+ return[L,Rr]}
 // ---- 線画描画(用紙A3横 1190.55×841.89pt 基準)
 function render(ctx,Wpx,els,g,o){
  const A3W=o.pw||1190.55,A3H=o.ph||841.89,k=Wpx/A3W;ctx.setTransform(k,0,0,k,0,0);ctx.fillStyle='#fff';ctx.fillRect(0,0,A3W,A3H);
  const mt=R*Math.cos(rad(g.lat0)),ppm=A3W/(g.mw||g.N*PW),cx=rad(g.lon0),cy=myU(g.lat0);
  const P=(la,lo)=>[A3W/2+(rad(lo)-cx)*mt*ppm,A3H/2-(myU(la)-cy)*mt*ppm];
- const bl=[],rd=[],fp=[],rw=[],wl=[],wp=[],pn=[];
+ const bl=[],rd=[],fp=[],rw=[],wl=[],wp=[],pn=[],sd=[],zb=[];
  for(const e of els){const t=e.tags||{};
   if(e.type==='node'){if(t.name&&!POIX.has(t.amenity)&&e.lat!=null)pn.push({p:P(e.lat,e.lon),n:t.name});continue}
   if(e.type==='way'){const pts=(e.geometry||[]).filter(p=>p&&p.lat!=null).map(p=>P(p.lat,p.lon));if(pts.length<2)continue;
    if(t.building){bl.push({rings:[pts],name:t.name});continue}
    if(t.waterway==='riverbank'||t.natural==='water'){wp.push({rings:[pts]});continue}
    if(t.highway){if(t.area==='yes'||(t.tunnel&&t.tunnel!=='no'&&t.tunnel!=='building_passage'))continue;
+    if(t.footway==='sidewalk'||t.highway==='sidewalk'){const sw=parseFloat(t.width);sd.push({pts,w:sw>0?Math.min(sw,6):2});continue}
+    if(t.footway==='crossing'||t.highway==='crossing'){zb.push({pts});continue}
     if(THIN.has(t.highway)){fp.push(pts);continue}if(t.highway==='footway')continue;
-    const w=roadW(t);if(w>0)rd.push({pts,w});continue}
+    const w=roadW(t)*(o.rs||1);if(w>0)rd.push({pts,w,t});continue}
    if(t.railway){rw.push(pts);continue}
    if(t.waterway&&!(t.tunnel&&t.tunnel!=='no'))wl.push({pts,w:waterW(t)});continue}
   if(e.type==='relation'){const rings=buildRings(e).map(r=>r.map(p=>P(p[0],p[1])));if(!rings.length)continue;
@@ -1430,8 +1449,21 @@ function render(ctx,Wpx,els,g,o){
  if(o.road){
   for(const w of wp){poly(w.rings);ctx.fillStyle='#fff';ctx.fill('evenodd');ctx.strokeStyle='#444';ctx.lineWidth=.7;ctx.stroke()}
   const cor=rd.concat(wl).filter(c=>c.w*ppm>=1.6),thin=rd.concat(wl).filter(c=>c.w*ppm<1.6);
+  if(o.sw!=='none'){const bands=sd.map(b=>({pts:b.pts,w:b.w}));
+   for(const c of rd){if(c.w*ppm<1.6||!c.t)continue;const[L,Rr]=swSides(c.t,o.sw==='est');if(!L&&!Rr)continue;
+    const sw=parseFloat(c.t['sidewalk:width'])>0?Math.min(+c.t['sidewalk:width'],6):2,off=(c.w/2+sw/2)*ppm;
+    if(L)bands.push({pts:offs(c.pts,off),w:sw});if(Rr)bands.push({pts:offs(c.pts,-off),w:sw})}
+   ctx.strokeStyle='#555';for(const b of bands){ctx.lineWidth=b.w*ppm+1;pl(b.pts);ctx.stroke()}
+   ctx.strokeStyle='#ededed';for(const b of bands){ctx.lineWidth=b.w*ppm;pl(b.pts);ctx.stroke()}}
   ctx.strokeStyle='#3a3a3a';for(const c of cor){ctx.lineWidth=c.w*ppm+1;pl(c.pts);ctx.stroke()}
   ctx.strokeStyle='#fff';for(const c of cor){ctx.lineWidth=c.w*ppm;pl(c.pts);ctx.stroke()}
+  if(o.zb){ctx.strokeStyle='#333';ctx.fillStyle='#fff';ctx.lineWidth=.45;
+   const th=Math.max(1.2,.45*ppm),sp=Math.max(2.6,.9*ppm),hl=Math.max(3,3*ppm/2+.5*ppm);
+   for(const z of zb){let rest=sp/2;
+    for(let i=0;i<z.pts.length-1;i++){const a=z.pts[i],b=z.pts[i+1],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);if(len<1e-6)continue;const ux=dx/len,uy=dy/len;
+     let d=rest;for(;d<=len;d+=sp){const cx=a[0]+ux*d,cy=a[1]+uy*d,px=-uy,py=ux;
+      ctx.beginPath();ctx.moveTo(cx-ux*th/2-px*hl,cy-uy*th/2-py*hl);ctx.lineTo(cx+ux*th/2-px*hl,cy+uy*th/2-py*hl);ctx.lineTo(cx+ux*th/2+px*hl,cy+uy*th/2+py*hl);ctx.lineTo(cx-ux*th/2+px*hl,cy-uy*th/2+py*hl);ctx.closePath();ctx.fill();ctx.stroke()}
+     rest=d-len}}}
   ctx.strokeStyle='#555';ctx.lineWidth=.6;for(const c of thin){pl(c.pts);ctx.stroke()}
   ctx.setLineDash([4,2.5]);ctx.strokeStyle='#777';ctx.lineWidth=.5;for(const p of fp){pl(p);ctx.stroke()}ctx.setLineDash([]);
   ctx.strokeStyle='#222';ctx.lineWidth=1.5;for(const p of rw){pl(p);ctx.stroke()}
@@ -1460,7 +1492,7 @@ function render(ctx,Wpx,els,g,o){
   ctx.font='bold 9px Arial,"Yu Gothic",sans-serif';ctx.textAlign='center';for(let i=0;i<=4;i++)if(u*ppm>=30||i%2==0)ctx.fillText(i?i*u+'m':'0',x0+i*u*ppm,y+12);ctx.restore()}
  if(o.attr){ctx.save();ctx.font='7px "Yu Gothic","Hiragino Sans",Meiryo,sans-serif';ctx.fillStyle='#555';ctx.textAlign='right';ctx.fillText('地図データ © OpenStreetMap contributors',A3W-10,A3H-8);ctx.restore()}
  ctx.setTransform(1,0,0,1,0,0)}
-const opts=()=>({name:q('#rdoName').checked,north:q('#rdoNorth').checked,fill:q('#rdoFill').checked,scale:q('#rdoScale').checked,road:q('#rdoRoad').checked,bld:q('#rdoBld').checked,attr:q('#rdoAttr').checked});
+const opts=()=>({name:q('#rdoName').checked,north:q('#rdoNorth').checked,fill:q('#rdoFill').checked,scale:q('#rdoScale').checked,road:q('#rdoRoad').checked,bld:q('#rdoBld').checked,attr:q('#rdoAttr').checked,sw:q('#rdoSw').value,zb:q('#rdoZb').checked,rs:Math.min(2,Math.max(.5,(+q('#rdoRs').value||100)/100))});
 function renderPreview(){if(!osm||!geo)return;const c=q('#rdcv'),W=1800;c.width=W;c.height=Math.round(W*A3H/A3W);render(c.getContext('2d'),W,osm,geo,opts());
  st('縮尺 1/'+geo.N+'(A3横 / 用紙の幅=実寸約'+Math.round(geo.N*PW)+'m)。表示を確認して「作図画面に反映」を押してください。','ok')}
 // ---- 作図画面へ反映
@@ -1783,7 +1815,7 @@ q('#rdgo').onclick=async()=>{const t=q('#rdq').value.trim();if(!t||!map)return;
   const c=j[0].geometry.coordinates;map.setView([c[1],c[0]],18);st('「'+((j[0].properties&&j[0].properties.title)||t)+'」付近を表示しました。')}
  catch(e){st('住所検索に失敗しました。ネットワーク接続を確認してください。','err')}};
 q('#rdq').onkeydown=e=>{if(e.key==='Enter')q('#rdgo').click()};
-['rdoName','rdoNorth','rdoFill','rdoScale','rdoRoad','rdoBld','rdoAttr'].forEach(i=>q('#'+i).onchange=renderPreview);
+['rdoName','rdoNorth','rdoFill','rdoScale','rdoRoad','rdoBld','rdoAttr','rdoSw','rdoZb','rdoRs'].forEach(i=>q('#'+i).onchange=renderPreview);
 q('#rdback').onclick=()=>{view(1);initMap();startSel()};
 q('#rdok').onclick=applyToCanvas;
 q('#blank').addEventListener('click',()=>{S.mapBg=null});
