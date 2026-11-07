@@ -1493,16 +1493,23 @@ async function fetchGsi(g){
 // 施設名(任意): OpenStreetMapから名前だけ取得。失敗しても線画は作る
 async function fetchNames(g){
  const B=gbox(g),bb=[B.s,B.w,B.n,B.e].map(v=>v.toFixed(6)).join(',');
- const nd=['amenity','shop','tourism','office','leisure'].map(t=>`node["name"]["${t}"](${bb});`).join('');
- const el=await overpassRace(`[out:json][timeout:25];(${nd}way["building"]["name"](${bb}););out center qt;`);
- const out=[];for(const e of el){const t=e.tags||{};if(!t.name)continue;
+ const NT=['amenity','shop','tourism','office','leisure','healthcare','craft','historic','public_transport','man_made'];
+ const nd=NT.map(t=>`node["name"]["${t}"](${bb});`).join('');
+ const wy=NT.slice(0,6).map(t=>`way["name"]["${t}"](${bb});`).join('');
+ // 施設名(center)と、歩道・横断歩道の線(geom)を1回の問い合わせで取得
+ const el=await overpassRace(`[out:json][timeout:25];(${nd}way["building"]["name"](${bb});${wy});out center qt;(way["highway"="footway"]["footway"~"^(sidewalk|crossing)$"](${bb}););out geom qt;`);
+ const out=[];let sw=0;
+ for(const e of el){const t=e.tags||{};
+  if(e.type==='way'&&e.geometry&&t.highway==='footway'&&(t.footway==='sidewalk'||t.footway==='crossing')){
+   out.push({type:'way',tags:{highway:'footway',footway:t.footway,width:t.width},geometry:e.geometry});sw++;continue}
+  if(!t.name)continue;
   if(e.type==='node'&&e.lat!=null)out.push({type:'node',lat:e.lat,lon:e.lon,tags:t});
   else if(e.type==='way'&&e.center)out.push({type:'node',lat:e.center.lat,lon:e.center.lon,tags:{name:t.name}})}
- return out}
+ g.swn=sw;return out}
 async function fetchBase(g){
  if(q('#rdsrc').value==='gsi'){
   try{const els=await fetchGsi(g);g.src='gsi';g.nm=false;
-   st('施設名を取得中…');
+   st('施設名・歩道データを取得中…');
    try{const nm=await Promise.race([fetchNames(g),new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),12000))]);if(nm.length){els.push(...nm);g.nm=true}}catch(e){}
    return els}
   catch(e){st('国土地理院のデータを取得できなかったため(' +(e&&e.message||e)+')、OpenStreetMapで作成します…','err')}}
@@ -1577,6 +1584,7 @@ function render(ctx,Wpx,els,g,o){
     if(L)bands.push({pts:offs(c.pts,off),w:sw});if(Rr)bands.push({pts:offs(c.pts,-off),w:sw})}
    ctx.strokeStyle='#555';for(const b of bands){ctx.lineWidth=b.w*ppm+1;pl(b.pts);ctx.stroke()}
    ctx.strokeStyle='#ededed';for(const b of bands){ctx.lineWidth=b.w*ppm;pl(b.pts);ctx.stroke()}}
+  if(g.src==='gsi'){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.8;for(const p of ge){pl(p);ctx.stroke()}ctx.strokeStyle='#555';ctx.lineWidth=.6;for(const p of ge2){pl(p);ctx.stroke()}}
   ctx.strokeStyle='#3a3a3a';for(const c of cor){ctx.lineWidth=c.w*ppm+1;pl(c.pts);ctx.stroke()}
   ctx.strokeStyle='#fff';for(const c of cor){ctx.lineWidth=c.w*ppm;pl(c.pts);ctx.stroke()}
   if(o.zb){ctx.strokeStyle='#333';ctx.fillStyle='#fff';ctx.lineWidth=.45;
@@ -1613,11 +1621,11 @@ function render(ctx,Wpx,els,g,o){
   const x0=34,y=A3H-34,L=4*u*ppm;ctx.save();ctx.strokeStyle='#222';ctx.fillStyle='#222';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x0+L,y);
   for(let i=0;i<=4;i++){ctx.moveTo(x0+i*u*ppm,y);ctx.lineTo(x0+i*u*ppm,y-(i%2?4:7))}ctx.stroke();
   ctx.font='bold 9px Arial,"Yu Gothic",sans-serif';ctx.textAlign='center';for(let i=0;i<=4;i++)if(u*ppm>=30||i%2==0)ctx.fillText(i?i*u+'m':'0',x0+i*u*ppm,y+12);ctx.restore()}
- if(o.attr){ctx.save();ctx.font='7px "Yu Gothic","Hiragino Sans",Meiryo,sans-serif';ctx.fillStyle='#555';ctx.textAlign='right';ctx.fillText(g.src==='gsi'?'出典:国土地理院(基盤地図情報・最適化ベクトルタイル)'+(g.nm?' / 施設名:© OpenStreetMap contributors':''):'地図データ © OpenStreetMap contributors',A3W-10,A3H-8);ctx.restore()}
+ if(o.attr){ctx.save();ctx.font='7px "Yu Gothic","Hiragino Sans",Meiryo,sans-serif';ctx.fillStyle='#555';ctx.textAlign='right';ctx.fillText(g.src==='gsi'?'出典:国土地理院(基盤地図情報・最適化ベクトルタイル)'+(g.nm?' / 施設名・歩道:© OpenStreetMap contributors':''):'地図データ © OpenStreetMap contributors',A3W-10,A3H-8);ctx.restore()}
  ctx.setTransform(1,0,0,1,0,0)}
 const opts=()=>({name:q('#rdoName').checked,north:q('#rdoNorth').checked,fill:q('#rdoFill').checked,scale:q('#rdoScale').checked,road:q('#rdoRoad').checked,bld:q('#rdoBld').checked,attr:q('#rdoAttr').checked,sw:q('#rdoSw').value,zb:q('#rdoZb').checked,rs:Math.min(2,Math.max(.5,(+q('#rdoRs').value||100)/100))});
 function renderPreview(){if(!osm||!geo)return;const c=q('#rdcv'),W=1800;c.width=W;c.height=Math.round(W*A3H/A3W);render(c.getContext('2d'),W,osm,geo,opts());
- st((geo.src==='gsi'?'[国土地理院] ':'[OpenStreetMap] ')+'縮尺 1/'+geo.N+'(A3横 / 用紙の幅=実寸約'+Math.round(geo.N*PW)+'m)。表示を確認して「作図画面に反映」を押してください。'+(geo.src==='gsi'&&geo.lay?'  [取得データ: '+geo.lay+']':''),'ok')}
+ st((geo.src==='gsi'?'[国土地理院] ':'[OpenStreetMap] ')+'縮尺 1/'+geo.N+'(A3横 / 用紙の幅=実寸約'+Math.round(geo.N*PW)+'m)。表示を確認して「作図画面に反映」を押してください。'+(geo.src==='gsi'?'  [歩道(OSM): '+(geo.swn||0)+'本'+(geo.swn?'':' ※該当地域のOSMに歩道の登録なし')+']':'')+(geo.src==='gsi'&&geo.lay?'  [取得データ: '+geo.lay+']':''),'ok')}
 // ---- 作図画面へ反映
 function applyToCanvas(){
  if(!osm||!geo)return;
