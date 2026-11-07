@@ -1875,10 +1875,22 @@ function render(ctx,Wpx,els,g,o){
   ctx.strokeStyle='#fff';for(const c of cor){ctx.lineWidth=c.w*ppm;pl(c.pts);ctx.stroke()}
   if(o.zb){ctx.strokeStyle='#333';ctx.fillStyle='#fff';ctx.lineWidth=.45;
    const th=Math.max(1.2,.45*ppm),sp=Math.max(2.6,.9*ppm),hl=Math.max(3,3*ppm/2+.5*ppm);
+   // 縞が歩道エリア(道路縁・歩道線)へはみ出さないよう、各縞を最寄りの縁線で切り詰める
+   const eseg=[];const addL=(pts)=>{for(let i=0;i<pts.length-1;i++)eseg.push([pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1]])};
+   if(ri){const{s:rs,ax:rx,ay:ry}=riT();for(const L of ri.lines){if(L.k!=='edge'&&L.k!=='thin')continue;addL(L.pts.map(pp=>[rx+pp[0]*rs,ry+pp[1]*rs]))}}
+   for(const pp of ge)addL(pp);for(const pp of ge2)addL(pp);
+   for(const b of sd){const hw=(b.w||2)*ppm/2;if(hw<=0)continue;const l1=offs(b.pts,hw),l2=offs(b.pts,-hw);if(l1&&l1.length===b.pts.length)addL(l1);if(l2&&l2.length===b.pts.length)addL(l2)}
+   const hit=(cx,cy,dx,dy,mx)=>{let best=mx;for(const e of eseg){
+     const x1=e[0],y1=e[1],ex=e[2]-x1,ey=e[3]-y1;
+     if(Math.min(x1,e[2])>cx+Math.abs(dx)*mx+.5||Math.max(x1,e[2])<cx-Math.abs(dx)*mx-.5||Math.min(y1,e[3])>cy+Math.abs(dy)*mx+.5||Math.max(y1,e[3])<cy-Math.abs(dy)*mx-.5)continue;
+     const den=dx*ey-dy*ex;if(Math.abs(den)<1e-9)continue;
+     const t=((x1-cx)*ey-(y1-cy)*ex)/den,u=((x1-cx)*dy-(y1-cy)*dx)/den;
+     if(t>.4&&t<best&&u>=0&&u<=1)best=t}return best};
    for(const z of zb){let rest=sp/2;
     for(let i=0;i<z.pts.length-1;i++){const a=z.pts[i],b=z.pts[i+1],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);if(len<1e-6)continue;const ux=dx/len,uy=dy/len;
      let d=rest;for(;d<=len;d+=sp){const cx=a[0]+ux*d,cy=a[1]+uy*d,px=-uy,py=ux;
-      ctx.beginPath();ctx.moveTo(cx-ux*th/2-px*hl,cy-uy*th/2-py*hl);ctx.lineTo(cx+ux*th/2-px*hl,cy+uy*th/2-py*hl);ctx.lineTo(cx+ux*th/2+px*hl,cy+uy*th/2+py*hl);ctx.lineTo(cx-ux*th/2+px*hl,cy-uy*th/2+py*hl);ctx.closePath();ctx.fill();ctx.stroke()}
+      let hp=hit(cx,cy,px,py,hl),hm=hit(cx,cy,-px,-py,hl);if(hp+hm<3){hp=hl;hm=hl}else{hp=Math.max(.8,hp-.3);hm=Math.max(.8,hm-.3)}
+      ctx.beginPath();ctx.moveTo(cx-ux*th/2-px*hm,cy-uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2-px*hm,cy+uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2+px*hp,cy+uy*th/2+py*hp);ctx.lineTo(cx-ux*th/2+px*hp,cy-uy*th/2+py*hp);ctx.closePath();ctx.fill();ctx.stroke()}
      rest=d-len}}}
   ctx.strokeStyle='#555';ctx.lineWidth=.6;for(const c of thin){pl(c.pts);ctx.stroke()}
   ctx.setLineDash([4,2.5]);ctx.strokeStyle='#777';ctx.lineWidth=.5;for(const p of fp){pl(p);ctx.stroke()}ctx.setLineDash([]);
