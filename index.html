@@ -134,11 +134,11 @@ setInterval(chk,300000);document.addEventListener('visibilitychange',()=>{if(!do
 <aside>
 <h1>仮設計画図作成ツール</h1>
 <div id="siteBox"><div class="row"><b>現場</b><select id="siteSel" style="flex:1;min-width:0"></select></div><div class="row"><button id="siteNew" title="新しい現場を登録">＋新規</button><button id="siteSave" title="今の内容を保存">💾保存</button><button id="siteRen">名前変更</button><button id="siteDup">複製</button><button id="siteDel">削除</button></div><div class="row"><button id="siteExp" title="現場データをファイルに書き出し">書出</button><button id="siteImp" title="書き出したファイルを読込">読込</button><input type="file" id="siteImpF" accept=".json,application/json" hidden><span id="siteSt" class="small" style="margin-left:auto"></span></div></div>
-<details class="sec" data-k="road" open><summary>道路使用許可 図面(地理院地図)</summary><div class="sb">
+<details class="sec" data-k="road" open><summary>道路使用許可 図面</summary><div class="sb">
 <div class="row"><button id="rdOpenP" style="width:100%;font-weight:700">📍 位置図(付近見取図)を作成</button></div>
 <div class="row"><button id="rdOpen" style="width:100%;font-weight:700">🗺 道路使用図(規制図)の下図を作成</button></div>
 <div id="rdInfo" class="small"></div>
-<details class="hp"><summary>使い方・説明</summary><div class="small"><b>位置図(付近見取図)</b>:地図を合わせ、「区間を指定」(2点クリック)または「申請地」スタンプで場所を示し、タイトル・住所・期間などを入れて「位置図を作成」。広域図+詳細図のA4図面をJPG/PDFで出力します。<br><b>道路使用図(規制図)</b>:「PDF出力範囲指定」で範囲を囲むと道路・建物の線画(A3横)ができ、「作図画面に反映」で背景になります。以降は仮設物・重機・コーンなどを配置してください(縮尺は自動設定)。<br>※線画は同じ範囲のOpenStreetMapデータから作成します。道路幅員は参考値です。</div></details>
+<details class="hp"><summary>使い方・説明</summary><div class="small"><b>位置図(付近見取図)</b>:A4の位置図シートが開きます。下の「詳細位置図」の枠をクリックするとGoogleマップが開くので、場所を合わせて「エリアを選択して挿入」で範囲をドラッグすると、詳細位置図・同じ中心の広域図・赤枠と赤線が自動で入ります(取得はタイル画像だけなので数秒です)。JPG/PDFで出力できます。<br><b>道路使用図(規制図)</b>:「PDF出力範囲指定」で範囲を囲むと道路・建物の線画(A3横)ができ、「作図画面に反映」で背景になります。以降は仮設物・重機・コーンなどを配置してください(縮尺は自動設定)。<br>※線画は同じ範囲のOpenStreetMapデータから作成します。道路幅員は参考値です。</div></details>
 </div></details>
 <details class="sec" data-k="pdf" open><summary>① 配置図PDF・縮尺</summary><div class="sb">
 <div class="row"><input type="file" id="pdf" accept="application/pdf" style="width:100%"></div>
@@ -1213,11 +1213,11 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
   <span class="rdg"><button id="rdtabP" class="tab">位置図(付近見取図)</button><button id="rdtabR" class="tab">道路使用図(規制図)の下図</button></span>
   <span class="rdg" id="rdsrch"><input id="rdq" placeholder="住所・地名で検索"><button id="rdgo">検索</button></span>
   <span class="rdg" id="rdp1">
-   <button id="rdsecB" title="地図上の2点をクリックして、道路を使用する区間を赤線で示します">区間を指定</button>
-   <button id="rdstmB" title="申請地を示す★を地図上に置きます">「申請地」スタンプを配置</button>
+   <button id="rdpos" class="pri" title="地図上をドラッグして、詳細位置図に入れる範囲を囲みます">▭ エリアを選択して挿入</button>
+   <button id="rdsecB" title="地図上の2点をクリックして、道路を使用する区間を赤線で示します(任意)">区間を指定</button>
+   <button id="rdstmB" title="申請地を示す★を地図上に置きます(任意)">「申請地」スタンプを配置</button>
    <button id="rdclrB">指定を消す</button>
-   <label>広域図<select id="rdwm"><option value="5">5倍</option><option value="8" selected>8倍</option><option value="12">12倍</option></select></label>
-   <button id="rdpos" class="pri">位置図を作成</button>
+   <button id="rdpback">← 位置図に戻る</button>
   </span>
   <span class="rdg" id="rdv1">
    <button id="rdsel" class="pri" title="地図上をドラッグして、PDF(A3横)に出力する範囲を囲みます">PDF出力範囲指定</button>
@@ -1235,17 +1235,20 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
    <button id="rdok" class="pri">作図画面に反映</button>
   </span>
   <span class="rdg" id="rdp2" hidden>
-   <button id="rdpback">戻って編集</button><button id="rdjpg">JPGで出力</button><button id="rdpdf" class="pri">PDFで出力</button>
+   <button id="rdpick" class="pri" title="Googleマップを開いて、詳細位置図の範囲を選びます">🗺 詳細位置図を選ぶ(Googleマップ)</button>
+   <label>広域図<select id="rdwm"><option value="4">4倍</option><option value="6">6倍</option><option value="8">8倍</option><option value="12" selected>12倍</option><option value="16">16倍</option><option value="24">24倍</option></select></label>
+   <button id="rdjpg">JPGで出力</button><button id="rdpdf" class="pri">PDFで出力</button>
   </span>
   <button id="rdclose" style="margin-left:auto">閉じる</button>
  </div>
  <div id="rdform" hidden>
-  <label><input type="checkbox" id="rfT" checked>図面タイトル</label><input id="rfTv" value="道路使用許可申請 位置図" style="width:230px">
+  <label><input type="checkbox" id="rfT" checked>図面タイトル</label><input id="rfTv" value="● 位置図" style="width:230px">
   <label><input type="checkbox" id="rfA">住所</label><input id="rfAv" placeholder="例:栃木県宇都宮市〇〇町" style="width:210px">
   <label><input type="checkbox" id="rfP">使用目的</label><input id="rfPv" placeholder="例:〇〇工事/資材搬入/イベント" style="width:210px">
   <label><input type="checkbox" id="rfD">期間</label><input type="date" id="rfD1">〜<input type="date" id="rfD2">
   <label><input type="checkbox" id="rfH">時間帯</label><input type="time" id="rfH1">〜<input type="time" id="rfH2">
   <label><input type="checkbox" id="rfR">備考</label><input id="rfRv" placeholder="例:使用時間 8:00〜17:00/雨天中止" style="width:260px">
+  <label><input type="checkbox" id="rfN">方位・縮尺バー</label>
  </div>
  <div id="rdst"></div>
  <div id="rdbody">
@@ -1264,8 +1267,8 @@ const rad=d=>d*Math.PI/180,deg=r=>r*180/Math.PI;
 const myU=lat=>Math.log(Math.tan(Math.PI/4+rad(lat)/2));
 const latU=y=>deg(2*Math.atan(Math.exp(y))-Math.PI/2);
 const EP=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
-let map=null,gmP=null,selecting=false,geo=null,osm=null,rectPx=null,p0=null,busy=false,md=localStorage.getItem('kasetsu.rdmode')==='P'?'P':'R',stg=1,pmode=null,secPts=[],secMk=[],secLn=null,stampPt=null,stampMk=null,posD=null,posW=null,posGeo=null;
-const FW=515.28,FHW=250,FHD=300,FX=40;
+let map=null,gmP=null,selecting=false,geo=null,osm=null,rectPx=null,p0=null,busy=false,md=localStorage.getItem('kasetsu.rdmode')==='P'?'P':'R',stg=1,pmode=null,secPts=[],secMk=[],secLn=null,stampPt=null,stampMk=null,posImgs=null,posGeo=null,baseId='google';
+const FW=515.28,FHW=300,FHD=300,FX=40;
 const lay=q('#rdlay'),rect=q('#rdrect');
 function st(t,c){const e=q('#rdst');e.textContent=t||'';e.className=c||''}
 function loadMapLib(){
@@ -1276,41 +1279,55 @@ function loadMapLib(){
  gmP=new Promise((res,rej)=>{let i=0;const next=()=>{if(i>=urls.length){gmP=null;rej(new Error('load'));return}const s=document.createElement('script');s.src=urls[i++];s.onload=()=>res();s.onerror=()=>{s.remove();next()};document.head.appendChild(s)};next()});
  return gmP}
 const lsv=()=>{try{return Object.assign({lat:36.5658,lng:139.8836,z:18},JSON.parse(localStorage.getItem('kasetsu.gmview')||'{}'))}catch(e){return{lat:36.5658,lng:139.8836,z:18}}};
+// ---- 地図タイル(APIキー不要)。Google地図を既定、取り込めない場合は地理院地図へ自動で切り替え
+const TSRC={
+ google:{name:'Google マップ',tpl:'https://mt{s}.google.com/vt/lyrs=m&hl=ja&gl=JP&x={x}&y={y}&z={z}',sub:'0123',maxZ:20,g:1,at:'地図データ © Google',attr:'地図データ © Google'},
+ ghyb:{name:'Google 航空写真',tpl:'https://mt{s}.google.com/vt/lyrs=y&hl=ja&gl=JP&x={x}&y={y}&z={z}',sub:'0123',maxZ:20,g:1,at:'地図データ © Google',attr:'地図データ © Google'},
+ gsistd:{name:'地理院 標準地図',tpl:'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',maxZ:18,at:'出典:国土地理院',attr:'出典:<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院(地理院タイル)</a>'},
+ gsipale:{name:'地理院 淡色地図',tpl:'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',maxZ:18,at:'出典:国土地理院',attr:'出典:<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院(地理院タイル)</a>'},
+ gsiphoto:{name:'地理院 航空写真',tpl:'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',maxZ:18,at:'出典:国土地理院',attr:'出典:<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院(地理院タイル)</a>'}
+};
+try{const sb=localStorage.getItem('kasetsu.rdbase');if(TSRC[sb])baseId=sb}catch(e){}
+const LAY={};
 function initMap(){
  if(map){map.invalidateSize();return}
- const v=lsv(),attr='出典:<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院(地理院タイル)</a>';
- const tl=(id,ext)=>L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/'+id+'/{z}/{x}/{y}.'+ext,{maxZoom:20,maxNativeZoom:18,attribution:attr});
- const std=tl('std','png'),pale=tl('pale','png'),photo=tl('seamlessphoto','jpg');
- map=L.map(q('#rdmap'),{center:[v.lat,v.lng],zoom:v.z,zoomSnap:.5,zoomDelta:.5,maxZoom:20});
- std.addTo(map);L.control.layers({'標準地図':std,'淡色地図':pale,'航空写真':photo}).addTo(map);
- map.on('moveend',()=>{const c=map.getCenter();try{localStorage.setItem('kasetsu.gmview',JSON.stringify({lat:c.lat,lng:c.lng,z:map.getZoom()}))}catch(e){}});
- setMode(md)}
+ const v=lsv();
+ for(const id in TSRC){const t=TSRC[id];LAY[id]=L.tileLayer(t.tpl,{maxZoom:21,maxNativeZoom:t.maxZ,subdomains:t.sub||'abc',attribution:t.attr})}
+ map=L.map(q('#rdmap'),{center:[v.lat,v.lng],zoom:v.z,zoomSnap:.5,zoomDelta:.5,maxZoom:21});
+ LAY[baseId].addTo(map);
+ const ctl={};for(const id in TSRC)ctl[TSRC[id].name]=LAY[id];L.control.layers(ctl).addTo(map);
+ map.on('baselayerchange',e=>{for(const id in LAY)if(LAY[id]===e.layer){baseId=id;try{localStorage.setItem('kasetsu.rdbase',id)}catch(_){}}});
+ // Googleのタイルが1枚も表示できないときは地理院地図へ自動切替
+ let okN=0,ngN=0;['google','ghyb'].forEach(id=>{const l=LAY[id];l.on('tileload',()=>okN++);l.on('tileerror',()=>{ngN++;if(!okN&&ngN>=6&&map.hasLayer(l)){map.removeLayer(l);LAY.gsistd.addTo(map);baseId='gsistd';st('Googleマップの画像を表示できなかったため、地理院 標準地図に切り替えました。','err')}})});
+ map.on('moveend',()=>{const c=map.getCenter();try{localStorage.setItem('kasetsu.gmview',JSON.stringify({lat:c.lat,lng:c.lng,z:map.getZoom()}))}catch(e){}})}
+async function ensureMap(){try{await loadMapLib()}catch(e){st('地図を読み込めません。ネットワーク接続を確認してください。','err');return false}initMap();return true}
 function guideBox(){const b=q('#rdbody'),W=b.clientWidth,H=b.clientHeight;let w=W*.72,h=w*FHD/FW;if(h>H*.8){h=H*.8;w=h*FW/FHD}return{x:(W-w)/2,y:(H-h)/2,w,h}}
 function ui(){const R_=md==='R',P_=md==='P';
  q('#rdtabP').classList.toggle('on',P_);q('#rdtabR').classList.toggle('on',R_);
  q('#rdsrch').hidden=stg!=1;q('#rdv1').hidden=!(R_&&stg==1);q('#rdp1').hidden=!(P_&&stg==1);q('#rdv2').hidden=!(R_&&stg==2);q('#rdp2').hidden=!(P_&&stg==2);
- q('#rdform').hidden=!(P_&&stg==1);q('#rdpv').hidden=stg!=2;q('#rdmap').style.visibility=stg==1?'visible':'hidden';
- const g=guideBox(),e=q('#rdguide');Object.assign(e.style,{left:g.x+'px',top:g.y+'px',width:g.w+'px',height:g.h+'px',display:(P_&&stg==1)?'block':'none'})}
+ q('#rdform').hidden=!(P_&&stg==2);q('#rdpv').hidden=stg!=2;q('#rdmap').style.visibility=stg==1?'visible':'hidden';
+ q('#rdguide').style.display='none'}
 function view(n){stg=n;ui()}
-function setMode(m){if(map&&m!==md){stopSel();stopP()}md=m;stg=1;try{localStorage.setItem('kasetsu.rdmode',m)}catch(e){}ui();
- st(m==='P'?'位置図(付近見取図):地図を合わせ、青い点線の枠が「詳細図」の範囲になります。「区間を指定」または「申請地」スタンプで場所を示し、「位置図を作成」を押してください。':'道路使用図(規制図)の下図:地図を合わせて「PDF出力範囲指定」で範囲を囲むと、作図画面の背景になる線画を作ります。')}
+function setMode(m){if(map&&m!==md){stopSel();stopP()}md=m;stg=(m==='P')?2:1;try{localStorage.setItem('kasetsu.rdmode',m)}catch(e){}ui();
+ st(m==='P'?'位置図:下の「詳細位置図」の枠をクリックするとGoogleマップが開きます。範囲を選ぶと、広域図と赤枠が自動で入ります。':'道路使用図(規制図)の下図:地図を合わせて「PDF出力範囲指定」で範囲を囲むと、作図画面の背景になる線画を作ります。')}
+async function gotoMode(m){setMode(m);if(m==='R'){st('地図を読み込み中…');if(!await ensureMap())return;setMode('R')}else drawSheetPreview()}
 async function openDlg(m){
  q('#rdm').style.display='flex';stopSel();stopP();setMode(m||md);
- st('地図を読み込み中…');
- try{await loadMapLib()}catch(e){st('地図を読み込めません。ネットワーク接続を確認してください。','err');return}
- initMap();ui()}
+ if(md==='P'){drawSheetPreview();return}
+ st('地図を読み込み中…');if(!await ensureMap())return;setMode('R')}
 function closeDlg(){stopSel();stopP();q('#rdm').style.display='none'}
 // ---- 範囲指定
 const px2u=(x,y)=>{const ll=map.containerPointToLatLng([x,y]);return{mx:rad(ll.lng),my:myU(ll.lat)}};
-const fixedN=()=>+q('#rdsc').value||0;
+const fixedN=()=>md==='P'?0:(+q('#rdsc').value||0),asp=()=>md==='P'?FHD/FW:RAT;
 function calcN(r){const a=px2u(r.x,r.y+r.h/2),b=px2u(r.x+r.w,r.y+r.h/2),lat=latU(a.my);return (b.mx-a.mx)*R*Math.cos(rad(lat))/PW}
 function setRect(x,y,w,h,fx){rectPx={x,y,w,h,fixed:fx};Object.assign(rect.style,{display:'block',left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
- let n;try{n=fixedN()||calcN(rectPx)}catch(e){n=0}rect.firstChild.textContent=n?'縮尺 約 1/'+Math.round(n):''}
+ let n;try{n=fixedN()||calcN(rectPx)}catch(e){n=0}rect.firstChild.textContent=md==='P'?'詳細位置図の範囲':(n?'縮尺 約 1/'+Math.round(n):'')}
 function startSel(){stopP();if(!map){st('先に地図を表示してください。','err');return}selecting=true;rectPx=null;p0=null;rect.style.display='none';lay.style.display='block';q('#rdsel').classList.add('on');
+ if(md==='P'){st('地図上をドラッグして、詳細位置図にしたい範囲を囲んでください(Escで中止)。');return}
  st(fixedN()?'縮尺 1/'+fixedN()+' 固定:出力したい範囲の中心をクリックしてください(Escで中止)。':'地図上をドラッグして、出力範囲(A3横の比率)を囲んでください(Escで中止)。')}
 function stopSel(){selecting=false;p0=null;lay.style.display='none';rect.style.display='none';q('#rdsel').classList.remove('on')}
 const rel=e=>{const r=lay.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}};
-function drawFree(p){const dx=p.x-p0.x,dy=p.y-p0.y,w=Math.max(Math.abs(dx),Math.abs(dy)/RAT),h=w*RAT;setRect(dx>=0?p0.x:p0.x-w,dy>=0?p0.y:p0.y-h,w,h,false)}
+function drawFree(p){const dx=p.x-p0.x,dy=p.y-p0.y,w=Math.max(Math.abs(dx),Math.abs(dy)/asp()),h=w*asp();setRect(dx>=0?p0.x:p0.x-w,dy>=0?p0.y:p0.y-h,w,h,false)}
 function drawFixed(p){const c=px2u(p.x,p.y),lat=latU(c.my),mpp=156543.03392*Math.cos(rad(lat))/Math.pow(2,map.getZoom()),w=fixedN()*PW/mpp,h=w*RAT;setRect(p.x-w/2,p.y-h/2,w,h,true)}
 lay.onpointerdown=e=>{if(pmode){e.preventDefault();return}if(!selecting)return;e.preventDefault();try{lay.setPointerCapture(e.pointerId)}catch(_){}const p=rel(e);if(fixedN())drawFixed(p);else{p0=p;rectPx=null}};
 lay.onpointermove=e=>{if(pmode||!selecting)return;const p=rel(e);if(fixedN())drawFixed(p);else if(p0)drawFree(p)};
@@ -1318,6 +1335,7 @@ lay.onpointerup=e=>{if(pmode){placeP(rel(e));return}if(!selecting)return;if(fixe
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(selecting||pmode)&&q('#rdm').style.display==='flex'){e.stopPropagation();stopSel();stopP();st('指定を中止しました。')}},true);
 async function confirmSel(){
  if(busy)return;const r=rectPx;
+ if(md==='P'){stopSel();return confirmPick(r)}
  const c=px2u(r.x+r.w/2,r.y+r.h/2),lat0=latU(c.my),lon0=deg(c.mx);
  let N=r.fixed?fixedN():calcN(r);stopSel();
  if(!isFinite(N)||N<=0){st('範囲を計算できませんでした。もう一度囲んでください。','err');return}
@@ -1450,55 +1468,115 @@ function placeP(p){const c=px2u(p.x,p.y),pt={lat:latU(c.my),lng:deg(c.mx)};
  secPts.push(pt);secMk.push(dot(pt,'#fff','#e11d1d',7));
  if(secPts.length==2){secLn=L.polyline(secPts.map(p=>[p.lat,p.lng]),{color:'#e11d1d',weight:5}).addTo(map);stopP();st('使用区間を指定しました。続けて「位置図を作成」を押してください。')}
  else st('終点をクリックしてください。')}
-const FIDS=['rfT','rfTv','rfA','rfAv','rfP','rfPv','rfD','rfD1','rfD2','rfH','rfH1','rfH2','rfR','rfRv'];
+const FIDS=['rfT','rfTv','rfA','rfAv','rfP','rfPv','rfD','rfD1','rfD2','rfH','rfH1','rfH2','rfR','rfRv','rfN'];
 function saveForm(){try{localStorage.setItem('kasetsu.rdform',JSON.stringify(Object.fromEntries(FIDS.map(i=>[i,q('#'+i).type==='checkbox'?q('#'+i).checked:q('#'+i).value]))))}catch(e){}}
-(function(){try{const o=JSON.parse(localStorage.getItem('kasetsu.rdform')||'{}');FIDS.forEach(i=>{if(o[i]==null)return;const e=q('#'+i);if(e.type==='checkbox')e.checked=!!o[i];else e.value=o[i]})}catch(e){}FIDS.forEach(i=>q('#'+i).addEventListener('input',saveForm))})();
+(function(){try{const o=JSON.parse(localStorage.getItem('kasetsu.rdform')||'{}');if(o.rfTv==='道路使用許可申請 位置図')o.rfTv='● 位置図';FIDS.forEach(i=>{if(o[i]==null)return;const e=q('#'+i);if(e.type==='checkbox')e.checked=!!o[i];else e.value=o[i]})}catch(e){}FIDS.forEach(i=>q('#'+i).addEventListener('input',()=>{saveForm();if(md==='P'&&stg===2&&q('#rdm').style.display==='flex')drawSheetPreview()}))})();
 const jd=s=>{const m=/^(\d+)-(\d+)-(\d+)$/.exec(s||'');return m?+m[1]+'年'+ +m[2]+'月'+ +m[3]+'日':''};
 const jt=s=>{const m=/^(\d+):(\d+)$/.exec(s||'');return m?+m[1]+':'+m[2]:''};
 function rng(a,b,f){const x=f(a),y=f(b);return x&&y?x+' 〜 '+y:(x||y)}
-async function makePos(){
- if(busy)return;if(!map){st('先に地図を表示してください。','err');return}
- if(!secPts.length&&!stampPt){st('「区間を指定」または「申請地」スタンプで、申請場所を指定してください。','err');return}
- stopP();const g=guideBox(),a=px2u(g.x,g.y+g.h/2),b=px2u(g.x+g.w,g.y+g.h/2),c=px2u(g.x+g.w/2,g.y+g.h/2),lat0=latU(c.my),lon0=deg(c.mx);
+// ---- タイル取り込み(ネット取得はタイル画像のみ。数秒で完了)
+const TC=new Map();
+function loadTile(sid,z,x,y){
+ const t=TSRC[sid],u=t.tpl.replace('{s}',String((x+y)%4)).replace('{z}',z).replace('{x}',x).replace('{y}',y);
+ if(TC.has(u))return TC.get(u);
+ const p=new Promise(res=>{const im=new Image(),to=setTimeout(()=>{im.src='';res(null)},15000);im.crossOrigin='anonymous';
+  im.onload=()=>{clearTimeout(to);res(im)};im.onerror=()=>{clearTimeout(to);res(null)};im.src=u}).then(r=>{if(!r)TC.delete(u);return r});
+ if(TC.size>400)TC.delete(TC.keys().next().value);TC.set(u,p);return p}
+const FFN='"Yu Gothic","Hiragino Sans",Meiryo,sans-serif',CK=3,VW=781;
+// g={lat0,lon0,mw(幅の実寸m),asp} の範囲を、幅FW×高さhPt(pt)の画像(CK倍解像度)として描く。VW=画面スクリーンショット相当の幅(px)
+async function renderTiles(g,hPt,sid,onT){
+ const S0=TSRC[sid],Cw=Math.round(FW*CK),Ch=Math.round(hPt*CK);
+ const k=1/(R*Math.cos(rad(g.lat0))),hwU=g.mw/2*k,hhU=hwU*g.asp,cx=rad(g.lon0),cy=myU(g.lat0);
+ const zv=Math.log2(VW*Math.PI/(256*hwU)),zt=Math.max(1,Math.min(S0.maxZ,Math.round(zv)));
+ const n=Math.pow(2,zt),Wt=256*n,vw=hwU*Wt/Math.PI,vh=vw*g.asp,wx0=(cx-hwU+Math.PI)/(2*Math.PI)*Wt,wy0=(Math.PI-(cy+hhU))/(2*Math.PI)*Wt,sc=Cw/vw;
+ const tx0=Math.floor(wx0/256),tx1=Math.floor((wx0+vw)/256),ty0=Math.max(0,Math.floor(wy0/256)),ty1=Math.min(n-1,Math.floor((wy0+vh)/256));
+ const cv=document.createElement('canvas');cv.width=Cw;cv.height=Ch;const x=cv.getContext('2d');
+ x.fillStyle='#e8e8e8';x.fillRect(0,0,Cw,Ch);x.imageSmoothingQuality='high';
+ let tot=0,bad=0;const jobs=[];
+ for(let ty=ty0;ty<=ty1;ty++)for(let tx=tx0;tx<=tx1;tx++){tot++;const xm=((tx%n)+n)%n;
+  jobs.push(loadTile(sid,zt,xm,ty).then(im=>{if(!im){bad++;return}if(onT)onT();x.drawImage(im,(tx*256-wx0)*sc,(ty*256-wy0)*sc,256*sc+.7,256*sc+.7)}))}
+ await Promise.all(jobs);
+ x.save();x.scale(CK,CK);x.font='6.5px '+FFN;x.textAlign='right';x.textBaseline='bottom';const tw=x.measureText(S0.at).width+6;
+ x.fillStyle='rgba(255,255,255,.78)';x.fillRect(FW-tw,hPt-9,tw,9);x.fillStyle='#333';x.fillText(S0.at,FW-3,hPt-1.5);x.restore();
+ return{cv,n:tot,bad}}
+// ---- Googleマップで範囲を選んだあと: 詳細位置図+広域図を自動作成
+async function confirmPick(r){
+ const a=px2u(r.x,r.y+r.h/2),b=px2u(r.x+r.w,r.y+r.h/2),c=px2u(r.x+r.w/2,r.y+r.h/2),lat0=latU(c.my),lon0=deg(c.mx);
  const mw=(b.mx-a.mx)*R*Math.cos(rad(lat0));
- if(!isFinite(mw)||mw<=0){st('範囲を計算できませんでした。','err');return}
- if(mw>2500){st('詳細図の範囲が広すぎます(約2.5km以内)。地図を拡大してください。','err');return}
- let mult=+q('#rdwm').value||8;if(mw*mult>8000)mult=Math.max(2,Math.floor(8000/mw));
- const dg={lat0,lon0,mw,asp:FHD/FW},wg={lat0,lon0,mw:mw*mult,asp:FHW/FW};
- busy=true;const t0=Date.now(),tk=setInterval(()=>st('詳細図・広域図のデータを同時に取得中です…(経過 '+Math.round((Date.now()-t0)/1000)+'秒)'),500);st('詳細図・広域図のデータを同時に取得中です…');
- try{const[d,w]=await Promise.all([fetchOsm(dg,false),fetchOsm(wg,true)]);posD=d;posW=w;clearInterval(tk)}
- catch(err){clearInterval(tk);busy=false;st('地図データを取得できませんでした('+(err&&err.message||err)+')。時間をおいてもう一度お試しください。','err');return}
- busy=false;posGeo={dg,wg,mult,sec:secPts.slice(),stamp:stampPt};stg=2;ui();drawSheetPreview()}
+ if(!isFinite(mw)||mw<=0){st('範囲を計算できませんでした。もう一度囲んでください。','err');return}
+ if(mw>4000){st('範囲が広すぎます(約4km以内)。地図を拡大して、囲み直してください。','err');return}
+ const mult=wideMult(mw);
+ posGeo={dg:{lat0,lon0,mw,asp:FHD/FW},wg:{lat0,lon0,mw:mw*mult,asp:FHW/FW},mult,sec:secPts.slice(),stamp:stampPt};
+ await buildPos(['d','w'])}
+function wideMult(mw){let m=+q('#rdwm').value||12;if(mw*m>40000)m=Math.max(2,Math.floor(40000/mw));return m}
+async function buildPos(parts){
+ if(busy||!posGeo)return;busy=true;const G=posGeo;
+ let sid=(parts.length<2&&posImgs&&posImgs.sid)||baseId,n=0;
+ const onT=()=>{n++;if(n%4===0)st('地図を取り込み中…('+n+'枚)')};st('地図を取り込み中…');
+ const go=async s=>{const rs=await Promise.all(parts.map(p=>renderTiles(p==='d'?G.dg:G.wg,p==='d'?FHD:FHW,s,onT)));let t=0,bd=0;rs.forEach(r=>{t+=r.n;bd+=r.bad});return{rs,t,bd}};
+ let r,note='';
+ try{r=await go(sid);
+  if((!r.t||r.bd/r.t>.25)&&TSRC[sid].g){sid='gsistd';r=await go(sid);note='Googleの地図画像を取り込めなかったため、地理院 標準地図で作成しました。(右上の切替で地図の種類を変えられます)'}}
+ catch(e){r=null}
+ if(!r||!r.t||r.bd/r.t>.25){busy=false;st('地図画像を取得できませんでした。ネットワーク接続を確認して、もう一度お試しください。','err');return}
+ posImgs=posImgs||{};if(parts.includes('d'))posImgs.sid=sid;parts.forEach((p,i)=>{posImgs[p]=r.rs[i].cv});
+ busy=false;stopSel();stopP();stg=2;ui();
+ drawSheetPreview(note||'位置図ができました(広域図 '+G.mult+'倍)。詳細位置図の枠をクリックすると範囲を選び直せます。内容を確認して、JPGまたはPDFで出力してください。')}
+async function startPick(){
+ if(busy)return;st('Googleマップを読み込み中…');if(!await ensureMap())return;
+ stg=1;ui();map.invalidateSize();
+ const ad=q('#rfAv').value.trim();
+ if(!posGeo&&ad&&!q('#rdq').value){q('#rdq').value=ad;await q('#rdgo').onclick()}
+ if(!q('#rdst').classList.contains('err'))st('Googleマップが開きました。地図を動かして場所を合わせ、「エリアを選択して挿入」で詳細位置図にしたい範囲をドラッグで囲んでください。(「区間を指定」「申請地」は任意)')}
+// ---- 位置図シート(A4縦)。添付PDFのレイアウト: ● 位置図 / 住所 / 広域図(上) / 詳細位置図(下) / 赤枠+赤線
+let LAYO=null;
 function sheetCanvas(K){
  const SW=595.28,SH=841.89,c=document.createElement('canvas');c.width=Math.round(SW*K);c.height=Math.round(SH*K);
- const x=c.getContext('2d'),FF='"Yu Gothic","Hiragino Sans",Meiryo,sans-serif',G=posGeo;
+ const x=c.getContext('2d'),G=posGeo,I=posImgs;
  x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.setTransform(K,0,0,K,0,0);x.fillStyle='#111';x.textBaseline='alphabetic';x.textAlign='left';
- let y=44;const tx=q('#rfT').checked?q('#rfTv').value.trim():'';
- if(tx){x.font='bold 19px '+FF;x.fillText(tx,FX,y);y+=8}
- x.font='11px '+FF;const rows=[];
- const add=(l,v)=>{if(!v)return;const lead=l+':  ';let line=lead;for(const ch of v){if(x.measureText(line+ch).width>FW){rows.push(line);line='　　　'}line+=ch}rows.push(line)};
+ const tx=q('#rfT').checked?q('#rfTv').value.trim():'';
+ if(tx){x.font='bold 18px '+FFN;x.fillText(tx,FX,54)}
+ x.font='bold 12px '+FFN;const rows=[];
+ const add=(l,v)=>{if(!v)return;let line=l+'  ';for(const ch of v){if(x.measureText(line+ch).width>FW){rows.push(line);line='　　　　'}line+=ch}rows.push(line)};
  if(q('#rfA').checked)add('住所',q('#rfAv').value.trim());if(q('#rfP').checked)add('使用目的',q('#rfPv').value.trim());
  if(q('#rfD').checked)add('期間',rng(q('#rfD1').value,q('#rfD2').value,jd));if(q('#rfH').checked)add('時間帯',rng(q('#rfH1').value,q('#rfH2').value,jt));
  if(q('#rfR').checked)add('備考',q('#rfRv').value.trim());
- y+=14;for(const l of rows){x.fillText(l,FX,y);y+=15}
- const y0=Math.max(y+10,150),yW=y0+8,wEnd=yW+FHW,yDl=wEnd+24,yD=yDl+8;
- x.font='bold 13px '+FF;x.fillText('広域図',FX,y0);x.fillText('詳細図',FX,yDl);
- const sub=(els,g,o,fh,yy)=>{const mc=document.createElement('canvas');mc.width=Math.round(FW*K);mc.height=Math.round(fh*K);o.pw=FW;o.ph=fh;render(mc.getContext('2d'),mc.width,els,g,o);
-  x.setTransform(K,0,0,K,0,0);x.drawImage(mc,FX,yy,FW,fh);x.strokeStyle='#444';x.lineWidth=.8;x.strokeRect(FX,yy,FW,fh)};
- sub(posW,G.wg,{name:false,north:false,fill:true,scale:true,road:true,bld:true,attr:true},FHW,yW);
- const mark=(cx,p)=>{cx.fillStyle='#fff';cx.strokeStyle='#e11d1d';cx.lineWidth=1.8;cx.beginPath();cx.arc(p[0],p[1],3.6,0,7);cx.fill();cx.stroke()};
- sub(posD,G.dg,{name:true,north:true,fill:true,scale:true,road:true,bld:true,attr:true,after:(cx,P)=>{
-  if(G.sec.length){const pts=G.sec.map(s=>P(s.lat,s.lng));cx.lineCap='round';cx.lineJoin='round';
-   if(pts.length>1){cx.strokeStyle='#e11d1d';cx.lineWidth=3.2;cx.beginPath();cx.moveTo(pts[0][0],pts[0][1]);cx.lineTo(pts[1][0],pts[1][1]);cx.stroke()}pts.forEach(p=>mark(cx,p))}
-  if(G.stamp){const p=P(G.stamp.lat,G.stamp.lng);cx.save();cx.translate(p[0],p[1]);cx.beginPath();for(let i=0;i<10;i++){const r=i%2?4.2:10,a=-Math.PI/2+i*Math.PI/5;cx.lineTo(r*Math.cos(a),r*Math.sin(a))}cx.closePath();
-   cx.fillStyle='#e11d1d';cx.strokeStyle='#fff';cx.lineWidth=1.5;cx.fill();cx.stroke();cx.font='bold 10px '+FF;cx.textAlign='left';cx.lineWidth=3;cx.strokeStyle='#fff';cx.strokeText('申請地',13,4);cx.fillStyle='#e11d1d';cx.fillText('申請地',13,4);cx.restore()}}},FHD,yD);
- x.setTransform(K,0,0,K,0,0);
- const rw=FW/G.mult,rh=rw*FHD/FW,rx=FX+(FW-rw)/2,ry=yW+(FHW-rh)/2;
- x.strokeStyle='#e11d1d';x.lineWidth=1.3;x.strokeRect(rx,ry,rw,rh);x.beginPath();x.moveTo(rx,ry+rh);x.lineTo(FX,yD);x.moveTo(rx+rw,ry+rh);x.lineTo(FX+FW,yD);x.stroke();
- const d=new Date();x.fillStyle='#555';x.font='9px '+FF;x.textAlign='right';x.fillText('作成日:'+d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日',SW-FX,SH-24);
+ let y=83;for(const l of rows){x.fillText(l,FX,y);y+=15}
+ const y0=Math.max((rows.length?y-15:54)+30,100),yW=y0+11,wEnd=yW+FHW,yDl=wEnd+23,yD=yDl+9;
+ LAYO={dx:FX,dy:yD,dw:FW,dh:FHD,wy:yW};
+ const slot=(yy,h,t1,t2,blue)=>{x.save();x.fillStyle=blue?'#eaf2ff':'#f3f4f6';x.fillRect(FX,yy,FW,h);x.setLineDash([6,4]);x.strokeStyle=blue?'#1f6feb':'#9aa0a6';x.lineWidth=1.2;x.strokeRect(FX,yy,FW,h);x.setLineDash([]);
+  x.textAlign='center';x.fillStyle=blue?'#1f6feb':'#777';x.font=(blue?'bold 15px ':'12px ')+FFN;x.fillText(t1,FX+FW/2,yy+h/2-(t2?4:-4));
+  if(t2){x.font='11px '+FFN;x.fillStyle=blue?'#3b6fc4':'#888';x.fillText(t2,FX+FW/2,yy+h/2+16)}x.restore()};
+ if(I&&I.w)x.drawImage(I.w,FX,yW,FW,FHW);else slot(yW,FHW,'広域図','詳細位置図の範囲を選ぶと、ここに自動で入ります',false);
+ if(I&&I.d&&G){x.drawImage(I.d,FX,yD,FW,FHD);
+  const hwU=G.dg.mw/2/(R*Math.cos(rad(G.dg.lat0))),hhU=hwU*G.dg.asp,cxx=rad(G.dg.lon0),cyy=myU(G.dg.lat0);
+  const P=(la,lo)=>[FX+(rad(lo)-(cxx-hwU))/(2*hwU)*FW,yD+((cyy+hhU)-myU(la))/(2*hhU)*FHD];
+  x.save();x.beginPath();x.rect(FX,yD,FW,FHD);x.clip();
+  if(G.sec&&G.sec.length){const pts=G.sec.map(s=>P(s.lat,s.lng));x.lineCap='round';x.lineJoin='round';
+   if(pts.length>1){x.strokeStyle='#e11d1d';x.lineWidth=3.2;x.beginPath();x.moveTo(pts[0][0],pts[0][1]);x.lineTo(pts[1][0],pts[1][1]);x.stroke()}
+   pts.forEach(p=>{x.fillStyle='#fff';x.strokeStyle='#e11d1d';x.lineWidth=1.8;x.beginPath();x.arc(p[0],p[1],3.6,0,7);x.fill();x.stroke()})}
+  if(G.stamp){const p=P(G.stamp.lat,G.stamp.lng);x.save();x.translate(p[0],p[1]);x.beginPath();for(let i=0;i<10;i++){const r=i%2?4.2:10,a=-Math.PI/2+i*Math.PI/5;x.lineTo(r*Math.cos(a),r*Math.sin(a))}x.closePath();
+   x.fillStyle='#e11d1d';x.strokeStyle='#fff';x.lineWidth=1.5;x.fill();x.stroke();x.font='bold 10px '+FFN;x.textAlign='left';x.lineWidth=3;x.strokeStyle='#fff';x.strokeText('申請地',13,4);x.fillStyle='#e11d1d';x.fillText('申請地',13,4);x.restore()}
+  if(q('#rfN').checked){
+   x.save();x.translate(FX+FW-24,yD+30);x.lineWidth=1;x.strokeStyle='#111';x.fillStyle='rgba(255,255,255,.85)';x.beginPath();x.arc(0,0,14,0,7);x.fill();x.stroke();
+   x.fillStyle='#111';x.beginPath();x.moveTo(0,-11);x.lineTo(-5,8);x.lineTo(0,4);x.closePath();x.fill();x.font='bold 8px Arial,sans-serif';x.textAlign='center';x.fillText('N',0,-17);x.restore();
+   const mpp=G.dg.mw/FW;let u=5;for(const v of [5,10,20,25,50,100,200,500,1000,2000])if(v/mpp<=FW*.25)u=v;const L=u/mpp,bx=FX+14,by=yD+FHD-18;
+   x.save();x.fillStyle='rgba(255,255,255,.8)';x.fillRect(bx-6,by-12,L+38,22);x.strokeStyle='#111';x.fillStyle='#111';x.lineWidth=1.2;x.beginPath();x.moveTo(bx,by-4);x.lineTo(bx,by);x.lineTo(bx+L,by);x.lineTo(bx+L,by-4);x.stroke();
+   x.font='bold 8px Arial,sans-serif';x.textAlign='left';x.fillText(u+'m',bx+L+4,by);x.restore()}
+  x.restore()}
+ else slot(yD,FHD,'ここをクリックして、Googleマップから範囲を選択','(地図を動かして場所を合わせ、範囲をドラッグで囲むと自動で入ります)',true);
+ x.strokeStyle='#1e2d33';x.lineWidth=1.6;x.strokeRect(FX,yW,FW,FHW);x.strokeRect(FX,yD,FW,FHD);
+ if(I&&I.w&&I.d&&G){const m=G.mult||1,rw=FW/m,rh=rw*FHD/FW,rx=FX+(FW-rw)/2,ry=yW+(FHW-rh)/2;
+  x.strokeStyle='#e11d1d';x.lineWidth=1.3;x.strokeRect(rx,ry,rw,rh);x.beginPath();x.moveTo(rx,ry+rh);x.lineTo(FX,yD);x.moveTo(rx+rw,ry+rh);x.lineTo(FX+FW,yD);x.stroke()}
+ x.fillStyle='#111';x.font='bold 14px '+FFN;x.textAlign='left';x.lineJoin='round';x.lineWidth=4;x.strokeStyle='#fff';
+ x.strokeText('広域図',FX+2,y0);x.fillText('広域図',FX+2,y0);x.strokeText('詳細位置図',FX+2,yDl);x.fillText('詳細位置図',FX+2,yDl);
+ const d=new Date();x.fillStyle='#555';x.font='9px '+FFN;x.textAlign='right';x.fillText('作成日:'+d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日',SW-FX,SH-12);
  x.setTransform(1,0,0,1,0,0);return c}
-function drawSheetPreview(){if(!posGeo)return;const c=q('#rdcv'),s=sheetCanvas(2);c.width=s.width;c.height=s.height;c.getContext('2d').drawImage(s,0,0);
- st('位置図ができました(広域図 '+posGeo.mult+'倍)。内容を確認して、JPGまたはPDFで出力してください。','ok')}
+function drawSheetPreview(msg){const c=q('#rdcv'),s=sheetCanvas(2);c.width=s.width;c.height=s.height;c.getContext('2d').drawImage(s,0,0);if(msg)st(msg,'ok')}
+function inDetail(e){if(md!=='P'||stg!==2||!LAYO)return false;const cv=q('#rdcv'),r=cv.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*595.28,py=(e.clientY-r.top)/r.height*841.89;
+ return px>=LAYO.dx&&px<=LAYO.dx+LAYO.dw&&py>=LAYO.dy&&py<=LAYO.dy+LAYO.dh}
+q('#rdcv').addEventListener('click',e=>{if(inDetail(e))startPick()});
+q('#rdcv').addEventListener('mousemove',e=>{q('#rdcv').style.cursor=inDetail(e)?'pointer':''});
 const ymd=()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')};
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
 function jpegToPdf(jpg,w,h){const enc=s=>new TextEncoder().encode(s),parts=[],offs=[];let len=0;const push=b=>{parts.push(b);len+=b.length};
@@ -1510,13 +1588,14 @@ function jpegToPdf(jpg,w,h){const enc=s=>new TextEncoder().encode(s),parts=[],of
  const xr=len;let t='xref\n0 6\n0000000000 65535 f \n';for(let i=1;i<=5;i++)t+=String(offs[i]).padStart(10,'0')+' 00000 n \n';
  push(enc(t+'trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF'));
  const out=new Uint8Array(len);let p=0;for(const b of parts){out.set(b,p);p+=b.length}return out}
-function outJpg(){const c=sheetCanvas(3);c.toBlob(b=>dl(b,'位置図_'+ymd()+'.jpg'),'image/jpeg',.93)}
-function outPdf(){const c=sheetCanvas(3);c.toBlob(async b=>{const u=new Uint8Array(await b.arrayBuffer());dl(new Blob([jpegToPdf(u,c.width,c.height)],{type:'application/pdf'}),'位置図_'+ymd()+'.pdf')},'image/jpeg',.93)}
+function outJpg(){if(!posImgs||!posImgs.d){st('先に「詳細位置図」の枠をクリックして、地図から範囲を選んでください。','err');return}const c=sheetCanvas(3);c.toBlob(b=>dl(b,'位置図_'+ymd()+'.jpg'),'image/jpeg',.93)}
+function outPdf(){if(!posImgs||!posImgs.d){st('先に「詳細位置図」の枠をクリックして、地図から範囲を選んでください。','err');return}const c=sheetCanvas(3);c.toBlob(async b=>{const u=new Uint8Array(await b.arrayBuffer());dl(new Blob([jpegToPdf(u,c.width,c.height)],{type:'application/pdf'}),'位置図_'+ymd()+'.pdf')},'image/jpeg',.93)}
 // ---- イベント
 q('#rdOpen').onclick=()=>openDlg('R');q('#rdOpenP').onclick=()=>openDlg('P');q('#rdOpenQ').onclick=()=>openDlg();
-q('#rdtabP').onclick=()=>setMode('P');q('#rdtabR').onclick=()=>setMode('R');
-q('#rdsecB').onclick=()=>startP('sec');q('#rdstmB').onclick=()=>startP('stamp');q('#rdclrB').onclick=clearAll;q('#rdpos').onclick=makePos;
-q('#rdpback').onclick=()=>{stg=1;ui();initMap()};q('#rdjpg').onclick=outJpg;q('#rdpdf').onclick=outPdf;
+q('#rdtabP').onclick=()=>gotoMode('P');q('#rdtabR').onclick=()=>gotoMode('R');
+q('#rdsecB').onclick=()=>startP('sec');q('#rdstmB').onclick=()=>startP('stamp');q('#rdclrB').onclick=clearAll;q('#rdpos').onclick=()=>selecting?(stopSel(),st('範囲指定を中止しました。')):startSel();
+q('#rdpback').onclick=()=>{stopSel();stopP();if(posGeo){posGeo.sec=secPts.slice();posGeo.stamp=stampPt}stg=2;ui();drawSheetPreview(posImgs?'位置図に戻りました。':'')};q('#rdpick').onclick=startPick;q('#rdjpg').onclick=outJpg;q('#rdpdf').onclick=outPdf;
+q('#rdwm').onchange=async()=>{if(!posGeo)return;const mw=posGeo.dg.mw,m=wideMult(mw);posGeo.mult=m;posGeo.wg={lat0:posGeo.dg.lat0,lon0:posGeo.dg.lon0,mw:mw*m,asp:FHW/FW};await buildPos(['w'])};
 q('#rdclose').onclick=closeDlg;q('#rdsel').onclick=()=>selecting?(stopSel(),st('範囲指定を中止しました。')):startSel();
 q('#rdsc').onchange=()=>{if(selecting)startSel()};
 q('#rdgo').onclick=async()=>{const t=q('#rdq').value.trim();if(!t||!map)return;
