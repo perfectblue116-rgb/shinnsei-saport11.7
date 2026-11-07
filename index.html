@@ -1311,16 +1311,21 @@ const TSRC={
  gsipale:{name:'地理院 淡色地図',tpl:'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',maxZ:18,at:'出典:国土地理院',attr:'出典:<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院(地理院タイル)</a>'},
  gsiphoto:{name:'地理院 航空写真',tpl:'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',maxZ:18,at:'出典:国土地理院',attr:'出典:<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院(地理院タイル)</a>'}
 };
-try{const sb=localStorage.getItem('kasetsu.rdbase');if(TSRC[sb])baseId=sb}catch(e){}
+// 地図の種類はモード別に記憶: 位置図=Google(既定)、道路使用図(規制図)=地理院 標準地図(既定)
+const BK=m=>m==='R'?'kasetsu.rdbaseR':'kasetsu.rdbase';
+function modeBase(m){try{const v=localStorage.getItem(BK(m));if(TSRC[v])return v}catch(e){}return m==='R'?'gsistd':'google'}
+function applyModeBase(){const id=modeBase(md);baseId=id;if(!map)return;for(const k in LAY)if(map.hasLayer(LAY[k]))map.removeLayer(LAY[k]);LAY[id].addTo(map)}
+baseId=modeBase(md);
 const LAY={};
 function initMap(){
  if(map){map.invalidateSize();return}
+ baseId=modeBase(md);
  const v=lsv();
  for(const id in TSRC){const t=TSRC[id];LAY[id]=L.tileLayer(t.tpl,{maxZoom:21,maxNativeZoom:t.maxZ,subdomains:t.sub||'abc',attribution:t.attr})}
  map=L.map(q('#rdmap'),{center:[v.lat,v.lng],zoom:v.z,zoomSnap:.5,zoomDelta:.5,maxZoom:21});
  LAY[baseId].addTo(map);
  const ctl={};for(const id in TSRC)ctl[TSRC[id].name]=LAY[id];L.control.layers(ctl).addTo(map);
- map.on('baselayerchange',e=>{for(const id in LAY)if(LAY[id]===e.layer){baseId=id;try{localStorage.setItem('kasetsu.rdbase',id)}catch(_){}}});
+ map.on('baselayerchange',e=>{for(const id in LAY)if(LAY[id]===e.layer){baseId=id;try{localStorage.setItem(BK(md),id)}catch(_){}}});
  // Googleのタイルが1枚も表示できないときは地理院地図へ自動切替
  let okN=0,ngN=0;['google','ghyb'].forEach(id=>{const l=LAY[id];l.on('tileload',()=>okN++);l.on('tileerror',()=>{ngN++;if(!okN&&ngN>=6&&map.hasLayer(l)){map.removeLayer(l);LAY.gsistd.addTo(map);baseId='gsistd';st('Googleマップの画像を表示できなかったため、地理院 標準地図に切り替えました。','err')}})});
  map.on('moveend',()=>{const c=map.getCenter();try{localStorage.setItem('kasetsu.gmview',JSON.stringify({lat:c.lat,lng:c.lng,z:map.getZoom()}))}catch(e){}})}
@@ -1332,7 +1337,7 @@ function ui(){const R_=md==='R',P_=md==='P';
  q('#rdform').hidden=!(P_&&stg==2);q('#rdzm').hidden=!(P_&&stg==2);try{pvFit()}catch(e){}q('#rdedit').hidden=!(P_&&stg==2&&!!(posImgs&&posImgs.d));q('#rdpv').hidden=stg!=2;q('#rdmap').style.visibility=stg==1?'visible':'hidden';
  q('#rdguide').style.display='none'}
 function view(n){stg=n;ui()}
-function setMode(m){edReset();if(map&&m!==md){stopSel();stopP()}md=m;stg=(m==='P')?2:1;try{localStorage.setItem('kasetsu.rdmode',m)}catch(e){}ui();
+function setMode(m){edReset();if(map&&m!==md){stopSel();stopP()}md=m;stg=(m==='P')?2:1;try{localStorage.setItem('kasetsu.rdmode',m)}catch(e){}applyModeBase();ui();
  st(m==='P'?'位置図:下の「詳細位置図」の枠をクリックするとGoogleマップが開きます。範囲を選ぶと、広域図と赤枠が自動で入ります。':'道路使用図(規制図)の下図:地図を合わせて「PDF出力範囲指定」で範囲を囲むと、作図画面の背景になる線画を作ります。')}
 async function gotoMode(m){setMode(m);if(m==='R'){st('地図を読み込み中…');if(!await ensureMap())return;setMode('R')}else drawSheetPreview()}
 async function openDlg(m){
