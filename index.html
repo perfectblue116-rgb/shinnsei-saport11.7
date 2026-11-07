@@ -1243,6 +1243,7 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
   <span class="rdg" id="rdp2" hidden>
    <button id="rdpick" class="pri" title="Googleマップを開いて、詳細位置図の範囲を選びます">🗺 詳細位置図を選ぶ(Googleマップ)</button>
    <label>広域図<select id="rdwm"><option value="4">4倍</option><option value="6">6倍</option><option value="8">8倍</option><option value="12" selected>12倍</option><option value="16">16倍</option><option value="24">24倍</option></select></label>
+   <button id="rdfzi" title="赤枠(詳細位置図の範囲)を広げる。広域図の赤枠の四隅をドラッグしても変更できます">詳細範囲 ＋</button><button id="rdfzo" title="赤枠(詳細位置図の範囲)を狭める">詳細範囲 －</button>
    <button id="rdjpg">JPGで出力</button><button id="rdpdf" class="pri">PDFで出力</button>
   </span>
   <button id="rdclose" style="margin-left:auto">閉じる</button>
@@ -1540,7 +1541,7 @@ async function buildPos(parts){
  if(!r||!r.t||r.bd/r.t>.25){busy=false;st('地図画像を取得できませんでした。ネットワーク接続を確認して、もう一度お試しください。','err');return}
  posImgs=posImgs||{};if(parts.includes('d'))posImgs.sid=sid;parts.forEach((p,i)=>{posImgs[p]=r.rs[i].cv});
  busy=false;stopSel();stopP();stg=2;ui();
- drawSheetPreview(note||'位置図ができました(広域図 '+G.mult+'倍)。「詳細位置図を選ぶ」で範囲を選び直せます。「工事規制範囲(多角形)」で規制範囲を塗り潰せます。内容を確認して、JPGまたはPDFで出力してください。')}
+ drawSheetPreview(note||'位置図ができました(広域図 '+(Math.round(G.mult*10)/10)+'倍)。広域図の赤枠は、ドラッグで移動・四隅で拡大縮小できます(離すと詳細位置図が更新されます)。「詳細位置図を選ぶ」で範囲を選び直せます。「工事規制範囲(多角形)」で規制範囲を塗り潰せます。内容を確認して、JPGまたはPDFで出力してください。')}
 async function startPick(){
  if(busy)return;edReset();st('Googleマップを読み込み中…');if(!await ensureMap())return;
  stg=1;ui();map.invalidateSize();
@@ -1549,6 +1550,16 @@ async function startPick(){
  if(!q('#rdst').classList.contains('err'))st('Googleマップが開きました。地図を動かして場所を合わせ、「エリアを選択して挿入」で詳細位置図にしたい範囲をドラッグで囲んでください。(「区間を指定」「申請地」は任意)')}
 // ---- 位置図シート(A4縦)。添付PDFのレイアウト: ● 位置図 / 住所 / 広域図(上) / 詳細位置図(下) / 赤枠+赤線
 let LAYO=null;
+const FD={on:false,drag:null};
+// 広域図上の赤枠(=詳細位置図の範囲)の位置・大きさ(シート座標pt)。現在のposGeoから計算
+function wideRect(){const G=posGeo,L=LAYO;if(!G||!L)return null;const W=G.wg,D=G.dg,
+ hwW=W.mw/2/(R*Math.cos(rad(W.lat0))),hhW=hwW*W.asp,cxW=rad(W.lon0),cyW=myU(W.lat0),hwD=D.mw/2/(R*Math.cos(rad(D.lat0))),
+ w=FW*hwD/hwW,h=w*FHD/FW,cx=FX+(rad(D.lon0)-(cxW-hwW))/(2*hwW)*FW,cy=L.wy+((cyW+hhW)-myU(D.lat0))/(2*hhW)*FHW;
+ return{x:cx-w/2,y:cy-h/2,w,h}}
+// 赤枠(シート座標)から詳細位置図の範囲(dg)を更新
+function setWideRect(f){const G=posGeo,L=LAYO,W=G.wg,hwW=W.mw/2/(R*Math.cos(rad(W.lat0))),hhW=hwW*W.asp,cxW=rad(W.lon0),cyW=myU(W.lat0),
+ mx=cxW-hwW+(f.x+f.w/2-FX)/FW*2*hwW,my=cyW+hhW-(f.y+f.h/2-L.wy)/FHW*2*hhW,lat0=latU(my),lon0=deg(mx),hwD=f.w/FW*hwW,mw=2*hwD*R*Math.cos(rad(lat0));
+ G.dg={lat0,lon0,mw,asp:FHD/FW};G.mult=W.mw/mw}
 function sheetCanvas(K,ui){
  const SW=595.28,SH=841.89,c=document.createElement('canvas');c.width=Math.round(SW*K);c.height=Math.round(SH*K);
  const x=c.getContext('2d'),G=posGeo,I=posImgs;
@@ -1569,6 +1580,7 @@ function sheetCanvas(K,ui){
  if(I&&I.w)x.drawImage(I.w,FX,yW,FW,FHW);else slot(yW,FHW,'広域図','詳細位置図の範囲を選ぶと、ここに自動で入ります',false);
  if(I&&I.d&&G){x.drawImage(I.d,FX,yD,FW,FHD);
   const P=detM().P;
+  if(FD.on){x.save();x.fillStyle='rgba(255,255,255,.7)';x.fillRect(FX,yD,FW,FHD);x.fillStyle='#1f6feb';x.font='bold 13px '+FFN;x.textAlign='center';x.fillText('指を離すと詳細位置図を更新します',FX+FW/2,yD+FHD/2);x.restore()}else{
   x.save();x.beginPath();x.rect(FX,yD,FW,FHD);x.clip();
   for(const pg of posPoly){const pp=pg.pts.map(a=>P(a.lat,a.lng));if(pp.length<3)continue;x.beginPath();pp.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();
    x.save();x.globalAlpha=pg.fo;x.fillStyle=pg.fc;x.fill();x.restore();if(pg.bd&&pg.lw>0){x.lineJoin='round';x.strokeStyle=pg.fc;x.lineWidth=pg.lw;x.stroke()}
@@ -1585,11 +1597,13 @@ function sheetCanvas(K,ui){
    x.save();x.fillStyle='rgba(255,255,255,.8)';x.fillRect(bx-6,by-12,L+38,22);x.strokeStyle='#111';x.fillStyle='#111';x.lineWidth=1.2;x.beginPath();x.moveTo(bx,by-4);x.lineTo(bx,by);x.lineTo(bx+L,by);x.lineTo(bx+L,by-4);x.stroke();
    x.font='bold 8px Arial,sans-serif';x.textAlign='left';x.fillText(u+'m',bx+L+4,by);x.restore()}
   if(ui)edOverlay(x,P);
-  x.restore()}
+  x.restore()}}
  else slot(yD,FHD,'ここをクリックして、Googleマップから範囲を選択','(地図を動かして場所を合わせ、範囲をドラッグで囲むと自動で入ります)',true);
  x.strokeStyle='#1e2d33';x.lineWidth=1.6;x.strokeRect(FX,yW,FW,FHW);x.strokeRect(FX,yD,FW,FHD);
- if(I&&I.w&&I.d&&G){const m=G.mult||1,rw=FW/m,rh=rw*FHD/FW,rx=FX+(FW-rw)/2,ry=yW+(FHW-rh)/2;
-  x.strokeStyle='#e11d1d';x.lineWidth=1.3;x.strokeRect(rx,ry,rw,rh);x.beginPath();x.moveTo(rx,ry+rh);x.lineTo(FX,yD);x.moveTo(rx+rw,ry+rh);x.lineTo(FX+FW,yD);x.stroke()}
+ if(I&&I.w&&I.d&&G){const F=wideRect(),rx=F.x,ry=F.y,rw=F.w,rh=F.h;
+  x.strokeStyle='#e11d1d';x.lineWidth=1.3;x.strokeRect(rx,ry,rw,rh);x.beginPath();x.moveTo(rx,ry+rh);x.lineTo(FX,yD);x.moveTo(rx+rw,ry+rh);x.lineTo(FX+FW,yD);x.stroke();
+  if(ui){const kk=(q('#rdcv').clientWidth||595.28)/595.28,hs=5/kk;x.save();x.fillStyle='#fff';x.strokeStyle='#e11d1d';x.lineWidth=1.4/kk;
+   [[rx,ry],[rx+rw,ry],[rx,ry+rh],[rx+rw,ry+rh]].forEach(c=>{x.fillRect(c[0]-hs,c[1]-hs,hs*2,hs*2);x.strokeRect(c[0]-hs,c[1]-hs,hs*2,hs*2)});x.restore()}}
  x.fillStyle='#111';x.font='bold 14px '+FFN;x.textAlign='left';x.lineJoin='round';x.lineWidth=4;x.strokeStyle='#fff';
  x.strokeText('広域図',FX+2,y0);x.fillText('広域図',FX+2,y0);x.strokeText('詳細位置図',FX+2,yDl);x.fillText('詳細位置図',FX+2,yDl);
  const d=new Date();x.fillStyle='#555';x.font='9px '+FFN;x.textAlign='right';x.fillText('作成日:'+d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日',SW-FX,SH-12);
@@ -1690,6 +1704,57 @@ function edOverlay(x,P){
  q('#rdPclr').onclick=()=>{if(posPoly.length&&confirm('描いた工事規制範囲をすべて消します。よろしいですか?')){posPoly.length=0;ED.sel=null;ED.draw=null;redraw()}};
  ['rdFc','rdTr','rdBd','rdLw','rdLt','rdLs'].forEach(id=>q('#'+id).addEventListener('input',()=>{q('#rdTrv').textContent=q('#rdTr').value+'%';q('#rdLsv').textContent=q('#rdLs').value;const pg=selPoly();if(pg){Object.assign(pg,curStyle());redraw()}}));
  edHint();
+})();
+
+// ---- 広域図の赤枠(詳細位置図の範囲)を、ドラッグで移動・四隅で拡大縮小
+(function(){const cv=q('#rdcv');
+ const kk=()=>(cv.clientWidth||595.28)/595.28;
+ function hit(e){
+  if(md!=='P'||stg!==2||!posImgs||!posImgs.d||!posImgs.w||ED.draw||ED.mode==='poly')return null;
+  const F=wideRect();if(!F)return null;const p=toPt(e),tol=(e.pointerType==='touch'?20:11)/kk();
+  for(const c of [[-1,-1,F.x,F.y],[1,-1,F.x+F.w,F.y],[-1,1,F.x,F.y+F.h],[1,1,F.x+F.w,F.y+F.h]])
+   if(Math.hypot(p[0]-c[2],p[1]-c[3])<=tol)return{t:'c',hx:c[0],hy:c[1],F,p};
+  if(p[0]>=F.x&&p[0]<=F.x+F.w&&p[1]>=F.y&&p[1]<=F.y+F.h)return{t:'m',F,p};
+  return null}
+ async function commit(oldDg,oldMult,oldImg){
+  await buildPos(['d']);
+  if(posImgs.d===oldImg){posGeo.dg=oldDg;posGeo.mult=oldMult;redraw()}}
+ cv.addEventListener('pointerdown',e=>{
+  if(e.button||busy)return;const h=hit(e);if(!h)return;
+  e.preventDefault();e.stopPropagation();try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  FD.drag=Object.assign(h,{pid:e.pointerId,moved:false,oldDg:posGeo.dg,oldMult:posGeo.mult,oldImg:posImgs.d})});
+ cv.addEventListener('pointermove',e=>{
+  const d=FD.drag;
+  if(!d){const h=hit(e);if(h)cv.style.cursor=h.t==='m'?'move':(h.hx*h.hy>0?'nwse-resize':'nesw-resize');return}
+  if(e.pointerId!==d.pid)return;
+  const p=toPt(e),wy=LAYO.wy,F=d.F;let n;
+  if(!d.moved&&Math.hypot(p[0]-d.p[0],p[1]-d.p[1])*kk()<3)return;
+  d.moved=true;FD.on=true;
+  if(d.t==='m'){
+   const nx=Math.min(Math.max(F.x+p[0]-d.p[0],FX),FX+FW-F.w),ny=Math.min(Math.max(F.y+p[1]-d.p[1],wy),wy+FHW-F.h);
+   n={x:nx,y:ny,w:F.w,h:F.h}}
+  else{
+   const ar=FW/FHD,ax=d.hx>0?F.x:F.x+F.w,ay=d.hy>0?F.y:F.y+F.h,
+    w1=d.hx>0?p[0]-ax:ax-p[0],w2=(d.hy>0?p[1]-ay:ay-p[1])*ar,
+    mx=Math.min(d.hx>0?FX+FW-ax:ax-FX,(d.hy>0?wy+FHW-ay:ay-wy)*ar),
+    w=Math.min(Math.max(Math.max(w1,w2),FW/60),mx),h=w/ar;
+   n={x:d.hx>0?ax:ax-w,y:d.hy>0?ay:ay-h,w,h}}
+  setWideRect(n);redraw()});
+ const end=e=>{const d=FD.drag;if(!d||e.pointerId!==d.pid)return;
+  FD.drag=null;FD.on=false;try{cv.releasePointerCapture(e.pointerId)}catch(_){}
+  if(!d.moved){redraw();return}
+  commit(d.oldDg,d.oldMult,d.oldImg)};
+ cv.addEventListener('pointerup',end);
+ cv.addEventListener('pointercancel',e=>{const d=FD.drag;if(!d||e.pointerId!==d.pid)return;FD.drag=null;FD.on=false;posGeo.dg=d.oldDg;posGeo.mult=d.oldMult;redraw()});
+ // ボタンで詳細範囲を広げる/狭める(中心固定)
+ function scaleFrame(f){
+  if(busy||!posGeo||!posImgs||!posImgs.d||!posImgs.w||!LAYO)return;
+  const F=wideRect(),w=Math.min(Math.max(F.w*f,FW/60),FW),h=w*FHD/FW,cx=F.x+F.w/2,cy=F.y+F.h/2;
+  if(Math.abs(w-F.w)<.01)return;
+  const oldDg=posGeo.dg,oldMult=posGeo.mult,oldImg=posImgs.d;
+  setWideRect({x:Math.min(Math.max(cx-w/2,FX),FX+FW-w),y:Math.min(Math.max(cy-h/2,LAYO.wy),LAYO.wy+FHW-h),w,h});
+  commit(oldDg,oldMult,oldImg)}
+ q('#rdfzi').onclick=()=>scaleFrame(1.25);q('#rdfzo').onclick=()=>scaleFrame(1/1.25);
 })();
 const ymd=()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')};
 function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
