@@ -1258,7 +1258,9 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
   <b>詳細位置図の編集</b>
   <button id="rdPoly" class="pri" title="詳細位置図の上をクリックして頂点を置き、工事規制範囲を多角形で囲みます">⬠ 工事規制範囲(多角形)</button>
   <label>塗り色<input type="color" id="rdFc" value="#e11d1d"></label>
-  <label>透過<input id="rdTr" type="range" min="0" max="100" value="40" style="width:110px"><span id="rdTrv" style="min-width:34px">40%</span></label>
+  <label>透過<input id="rdTr" type="range" min="0" max="100" value="45" style="width:110px"><span id="rdTrv" style="min-width:34px">45%</span></label>
+  <label>表示文字<input id="rdLt" value="規制範囲" style="width:84px"></label>
+  <label>文字サイズ<input id="rdLs" type="range" min="6" max="80" value="14" style="width:100px"><span id="rdLsv" style="min-width:24px">14</span></label>
   <label><input type="checkbox" id="rdBd" checked>枠線</label>
   <label>太さ<input id="rdLw" type="number" min="0.5" max="10" step="0.5" value="1.5" style="width:56px"></label>
   <button id="rdPdel">🗑 選択を削除</button><button id="rdPclr">すべて消す</button>
@@ -1566,7 +1568,8 @@ function sheetCanvas(K,ui){
   const P=detM().P;
   x.save();x.beginPath();x.rect(FX,yD,FW,FHD);x.clip();
   for(const pg of posPoly){const pp=pg.pts.map(a=>P(a.lat,a.lng));if(pp.length<3)continue;x.beginPath();pp.forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));x.closePath();
-   x.save();x.globalAlpha=pg.fo;x.fillStyle=pg.fc;x.fill();x.restore();if(pg.bd&&pg.lw>0){x.lineJoin='round';x.strokeStyle=pg.fc;x.lineWidth=pg.lw;x.stroke()}}
+   x.save();x.globalAlpha=pg.fo;x.fillStyle=pg.fc;x.fill();x.restore();if(pg.bd&&pg.lw>0){x.lineJoin='round';x.strokeStyle=pg.fc;x.lineWidth=pg.lw;x.stroke()}
+   if(pg.lt){const L=polyLab(pg,P);x.save();x.font=labFont(pg);x.textAlign='center';x.textBaseline='middle';x.lineJoin='round';x.lineWidth=Math.max(2,pg.ls/5);x.strokeStyle='#fff';x.strokeText(pg.lt,L[0],L[1]);x.fillStyle='#e11d1d';x.fillText(pg.lt,L[0],L[1]);x.restore()}}
   if(G.sec&&G.sec.length){const pts=G.sec.map(s=>P(s.lat,s.lng));x.lineCap='round';x.lineJoin='round';
    if(pts.length>1){x.strokeStyle='#e11d1d';x.lineWidth=3.2;x.beginPath();x.moveTo(pts[0][0],pts[0][1]);x.lineTo(pts[1][0],pts[1][1]);x.stroke()}
    pts.forEach(p=>{x.fillStyle='#fff';x.strokeStyle='#e11d1d';x.lineWidth=1.8;x.beginPath();x.arc(p[0],p[1],3.6,0,7);x.fill();x.stroke()})}
@@ -1599,13 +1602,17 @@ function detM(){const G=posGeo;if(!G||!LAYO)return null;const hwU=G.dg.mw/2/(R*M
  return{P:(la,lo)=>[FX+(rad(lo)-(cxx-hwU))/(2*hwU)*FW,yD+((cyy+hhU)-myU(la))/(2*hhU)*FHD],inv:(px,py)=>({lng:deg(cxx-hwU+(px-FX)/FW*2*hwU),lat:latU(cyy+hhU-(py-yD)/FHD*2*hhU)})}}
 const toPt=e=>{const r=q('#rdcv').getBoundingClientRect();return[(e.clientX-r.left)/r.width*595.28,(e.clientY-r.top)/r.height*841.89]};
 const clampB=p=>[Math.min(Math.max(p[0],LAYO.dx),LAYO.dx+LAYO.dw),Math.min(Math.max(p[1],LAYO.dy),LAYO.dy+LAYO.dh)];
+const labFont=pg=>`700 ${pg.ls||14}px "Noto Sans JP","Yu Gothic","Hiragino Sans",sans-serif`;
+const polyLab=(pg,P)=>{if(pg.lab)return P(pg.lab.lat,pg.lab.lng);let la=0,lo=0;pg.pts.forEach(a=>{la+=a.lat;lo+=a.lng});return P(la/pg.pts.length,lo/pg.pts.length)};
+const _mc=document.createElement('canvas').getContext('2d');
+const labHit=(p,pg,M)=>{if(!pg.lt)return false;const L=polyLab(pg,M.P);_mc.font=labFont(pg);const w=_mc.measureText(pg.lt).width/2+4,h=(pg.ls||14)/2+4;return Math.abs(p[0]-L[0])<=w&&Math.abs(p[1]-L[1])<=h};
 const selPoly=()=>posPoly.find(p=>p.id===ED.sel);
-const curStyle=()=>({fc:q('#rdFc').value,fo:1-(+q('#rdTr').value)/100,bd:q('#rdBd').checked,lw:+q('#rdLw').value||1.5});
+const curStyle=()=>({fc:q('#rdFc').value,fo:1-(+q('#rdTr').value)/100,bd:q('#rdBd').checked,lw:+q('#rdLw').value||1.5,lt:q('#rdLt').value,ls:+q('#rdLs').value||14});
 const redraw=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(md==='P'&&stg===2)drawSheetPreview()})};
-function edHint(){const h=q('#rdPhint');h.textContent=ED.mode==='poly'?(ED.draw?'クリックで頂点を追加/始点クリック・ダブルクリック・Enterで確定/Backspaceで1点戻る/Escで中止':'詳細位置図の上をクリックして、工事規制範囲の頂点を置いてください'):'多角形をクリックで選択:頂点ドラッグで変形、本体ドラッグで移動、色・透過は上で変更、Deleteで削除';
+function edHint(){const h=q('#rdPhint');h.textContent=ED.mode==='poly'?(ED.draw?'クリックで頂点を追加/始点クリック・ダブルクリック・Enterで確定/Backspaceで1点戻る/Escで中止':'詳細位置図の上をクリックして、工事規制範囲の頂点を置いてください'):'多角形をクリックで選択:頂点ドラッグで変形、本体ドラッグで移動、赤文字ドラッグで文字移動、色・透過は上で変更、Deleteで削除';
  q('#rdPoly').classList.toggle('on',ED.mode==='poly')}
 function edReset(){ED.mode=null;ED.draw=null;ED.drag=null;ED.sel=null;try{edHint()}catch(e){}}
-function selectPoly(id){ED.sel=id;const pg=selPoly();if(pg){q('#rdFc').value=pg.fc;q('#rdTr').value=Math.round((1-pg.fo)*100);q('#rdTrv').textContent=q('#rdTr').value+'%';q('#rdBd').checked=!!pg.bd;q('#rdLw').value=pg.lw}}
+function selectPoly(id){ED.sel=id;const pg=selPoly();if(pg){q('#rdFc').value=pg.fc;q('#rdTr').value=Math.round((1-pg.fo)*100);q('#rdTrv').textContent=q('#rdTr').value+'%';q('#rdBd').checked=!!pg.bd;q('#rdLw').value=pg.lw;q('#rdLt').value=pg.lt||'';q('#rdLs').value=pg.ls||14;q('#rdLsv').textContent=pg.ls||14}}
 function finishPoly(){const d=ED.draw;ED.draw=null;ED.cur=null;ED.mode=null;
  if(d&&d.pts.length>=3){const pg=Object.assign({id:++pid,pts:d.pts},curStyle());posPoly.push(pg);selectPoly(pg.id)}
  edHint();redraw()}
@@ -1628,6 +1635,7 @@ function edOverlay(x,P){
    else{ED.draw={pts:[M.inv(p[0],p[1])]};ED.sel=null}
    ED.cur=p;edHint();redraw();return}
   const sp=selPoly();
+  for(let k=posPoly.length-1;k>=0;k--){const pg=posPoly[k];if(labHit(p,pg,M)){selectPoly(pg.id);const L=polyLab(pg,M.P);ED.drag={t:'l',id:pg.id,off:[p[0]-L[0],p[1]-L[1]]};redraw();return}}
   if(sp){const vi=hitV(p,sp,M);if(vi>=0){ED.drag={t:'v',i:vi,id:sp.id};return}}
   for(let k=posPoly.length-1;k>=0;k--){const pg=posPoly[k];if(inPoly(p,pg.pts.map(a=>M.P(a.lat,a.lng)))){selectPoly(pg.id);ED.drag={t:'b',id:pg.id,p0:p,orig:pg.pts.map(a=>M.P(a.lat,a.lng))};redraw();return}}
   ED.sel=null;redraw()});
@@ -1636,7 +1644,7 @@ function edOverlay(x,P){
   const has=posImgs&&posImgs.d,M=detM();
   if(ED.draw&&M){ED.cur=clampB(toPt(e));redraw();cv.style.cursor='crosshair';return}
   if(ED.drag&&M){const pg=posPoly.find(a=>a.id===ED.drag.id);if(!pg)return;const p=clampB(toPt(e)),d=ED.drag;
-   if(d.t==='v')pg.pts[d.i]=M.inv(p[0],p[1]);else{const dx=p[0]-d.p0[0],dy=p[1]-d.p0[1];pg.pts=d.orig.map(o=>M.inv(o[0]+dx,o[1]+dy))}redraw();return}
+   if(d.t==='l')pg.lab=M.inv(p[0]-d.off[0],p[1]-d.off[1]);else if(d.t==='v')pg.pts[d.i]=M.inv(p[0],p[1]);else{const dx=p[0]-d.p0[0],dy=p[1]-d.p0[1];pg.pts=d.orig.map(o=>M.inv(o[0]+dx,o[1]+dy))}redraw();return}
   if(!has){cv.style.cursor=inDetail(e)?'pointer':'';return}
   cv.style.cursor=ED.mode==='poly'?(inDetail(e)?'crosshair':''):(inDetail(e)?'default':'')});
  const up=()=>{ED.drag=null};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
@@ -1657,7 +1665,7 @@ function edOverlay(x,P){
  function delSel(){if(!ED.sel)return;const i=posPoly.findIndex(a=>a.id===ED.sel);if(i>=0)posPoly.splice(i,1);ED.sel=null;redraw()}
  q('#rdPdel').onclick=delSel;
  q('#rdPclr').onclick=()=>{if(posPoly.length&&confirm('描いた工事規制範囲をすべて消します。よろしいですか?')){posPoly.length=0;ED.sel=null;ED.draw=null;redraw()}};
- ['rdFc','rdTr','rdBd','rdLw'].forEach(id=>q('#'+id).addEventListener('input',()=>{q('#rdTrv').textContent=q('#rdTr').value+'%';const pg=selPoly();if(pg){Object.assign(pg,curStyle());redraw()}}));
+ ['rdFc','rdTr','rdBd','rdLw','rdLt','rdLs'].forEach(id=>q('#'+id).addEventListener('input',()=>{q('#rdTrv').textContent=q('#rdTr').value+'%';q('#rdLsv').textContent=q('#rdLs').value;const pg=selPoly();if(pg){Object.assign(pg,curStyle());redraw()}}));
  edHint();
 })();
 const ymd=()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')};
@@ -1711,13 +1719,13 @@ const sigSvg=(it,on)=>{const s=it.w/846;return`<g class="it" data-id="${it.id}" 
 
 const gBB=it=>{const xs=it.pts.map(p=>p.x),ys=it.pts.map(p=>p.y);return{x0:Math.min(...xs),x1:Math.max(...xs),y0:Math.min(...ys),y1:Math.max(...ys)}};
 const gTP=it=>{if(it.tp)return it.tp;const b=gBB(it);return{x:(b.x0+b.x1)/2,y:(b.y0+b.y1)/2}};
-const gTxt=it=>{if(!it.txt)return'';const t=gTP(it),fs=it.tfs||14,ls=String(it.txt).split('\n'),y0=t.y-(ls.length-1)*fs*.6;
- return`<text x="${t.x}" y="${y0}" font-size="${fs}" font-weight="${it.tbo===false?400:700}" fill="${it.tc||'#111'}" text-anchor="middle" dominant-baseline="central" pointer-events="none" style="paint-order:stroke;stroke:${isLight(it.tc||'#111')?'#333':'#fff'};stroke-width:${fs/8}px;stroke-linejoin:round">`+ls.map((l,i)=>`<tspan x="${t.x}" y="${y0+i*fs*1.2}">${esc(l)}</tspan>`).join('')+'</text>'};
+const gTxt=(it,hit)=>{if(!it.txt)return'';if(!it.t25){it.t25=1;if((it.tfs||14)==14)it.tfs=35}const t=gTP(it),fs=it.tfs||35,ls=String(it.txt).split('\n'),y0=t.y-(ls.length-1)*fs*.6;
+ return`<text x="${t.x}" y="${y0}" font-size="${fs}" font-weight="${it.tbo===false?400:700}" fill="${hit?'transparent':it.tc||'#111'}" text-anchor="middle" dominant-baseline="central" pointer-events="${hit?'all':'none'}" style="${hit?'cursor:move':`paint-order:stroke;stroke:${isLight(it.tc||'#111')?'#333':'#fff'};stroke-width:${fs/8}px;stroke-linejoin:round`}">`+ls.map((l,i)=>`<tspan x="${t.x}" y="${y0+i*fs*1.2}">${esc(l)}</tspan>`).join('')+'</text>'};
 window.gSvg=function(it,on){if(it.ty=='sig')return sigSvg(it,on);if(!it.pts||it.pts.length<2)return'';const d='M'+it.pts.map(p=>N(p.x)+' '+N(p.y)).join('L')+'Z',f=it.fill;
  return`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y})">`+(on?`<path d="${d}" fill="none" stroke="#f59e0b" stroke-width="${it.lw+6}" stroke-opacity=".3" stroke-linejoin="round" pointer-events="none"/>`:'')+(f?`<path d="${d}" fill="${it.fc}" fill-opacity="${it.fo}" stroke="none"/>`:'')+`<path d="${d}" fill="${f?'transparent':'none'}" stroke="transparent" stroke-width="${Math.max(10,it.lw+8)}" pointer-events="${f?'all':'stroke'}"/>`+(it.bd?`<path d="${d}" fill="none" stroke="${it.sc}" stroke-width="${it.lw}" stroke-linejoin="round" pointer-events="none"/>`:'')+gTxt(it)+'</g>'};
 window.gHdl=function(it){if(it.ty!='poly')return'';const zz=z(),hr=(matchMedia('(pointer:coarse)').matches?14:9)/zz,b=gBB(it),cx=(b.x0+b.x1)/2,cy=(b.y0+b.y1)/2;let o=`<g data-id="${it.id}" transform="translate(${it.x} ${it.y})"><rect x="${b.x0}" y="${b.y0}" width="${b.x1-b.x0}" height="${b.y1-b.y0}" fill="none" stroke="#2563eb" stroke-width="${1/zz}" stroke-dasharray="${4/zz} ${3/zz}" pointer-events="none"/>`;
  for(const[hx,hy,cu]of[[-1,-1,'nwse-resize'],[0,-1,'ns-resize'],[1,-1,'nesw-resize'],[1,0,'ew-resize'],[1,1,'nwse-resize'],[0,1,'ns-resize'],[-1,1,'nesw-resize'],[-1,0,'ew-resize']]){const x=cx+hx*(b.x1-b.x0)/2,y=cy+hy*(b.y1-b.y0)/2;o+=`<g data-h="gvz${hx},${hy}" style="cursor:${cu}"><circle cx="${x}" cy="${y}" r="${hr}" fill="transparent"/><rect x="${x-4/zz}" y="${y-4/zz}" width="${8/zz}" height="${8/zz}" fill="#fff" stroke="#2563eb" stroke-width="${1.6/zz}"/></g>`}
- if(it.txt){const t=gTP(it);o+=`<g data-h="gvt" style="cursor:move"><circle cx="${t.x}" cy="${t.y}" r="${hr}" fill="#2563eb" fill-opacity=".15" stroke="#2563eb" stroke-width="${1.2/zz}" stroke-dasharray="${3/zz} ${2/zz}"/></g>`}
+ if(it.txt){const t=gTP(it);o+=`<g data-h="gvt" style="cursor:move">${gTxt(it,1)}<circle cx="${t.x}" cy="${t.y}" r="${hr}" fill="#2563eb" fill-opacity=".15" stroke="#2563eb" stroke-width="${1.2/zz}" stroke-dasharray="${3/zz} ${2/zz}"/></g>`}
  return o+it.pts.map((p,i)=>`<g data-h="gv${i}" style="cursor:move"><circle cx="${p.x}" cy="${p.y}" r="${hr}" fill="transparent"/><circle cx="${p.x}" cy="${p.y}" r="${4/zz}" fill="#fff" stroke="#f59e0b" stroke-width="${1.6/zz}"/></g>`).join('')+'</g>'};
 window.gDrag=function(it,d,p){const lx=p.x-it.x,ly=p.y-it.y;
  if(d.h=='gvt'){it.tp={x:lx,y:ly};return}
@@ -1730,13 +1738,13 @@ window.gDrag=function(it,d,p){const lx=p.x-it.x,ly=p.y-it.y;
 // ---- プロパティ
 window.gProps=function(it,P){const q=s=>P.querySelector(s),dupb='<div class="row"><button id="g_dup">複製</button><button id="g_del">削除</button></div>';
  if(it.ty=='sig'){P.innerHTML=`<b>信号</b><div class="row">大きさ(幅)<input id="g_w" type="number" min="8" step="2" value="${Math.round(it.w)}"><button id="g_r">⟳90°</button></div>`+dupb;q('#g_w').onchange=e=>{it.w=Math.max(8,+e.target.value||it.w);draw()};q('#g_r').onclick=()=>{it.a=((it.a||0)+90)%360;draw()}}
- else{P.innerHTML=`<b>${it.name}</b><div class="row"><label><input type="checkbox" id="g_fill" ${it.fill?'checked':''}>塗りつぶし</label><input type="color" id="g_fc" value="${it.fc}"></div><div class="row">透過<input id="g_tr" type="range" min="0" max="100" value="${Math.round((1-it.fo)*100)}" style="width:110px"><span id="g_trv" class="small">${Math.round((1-it.fo)*100)}%</span></div><div class="row"><label><input type="checkbox" id="g_bd" ${it.bd?'checked':''}>枠線</label><input type="color" id="g_sc" value="${it.sc}">太さ<input id="g_lw" type="number" min="0.5" max="20" step="0.5" value="${it.lw}" style="width:52px"></div><div class="row"><button id="g_add" class="${G.pm=='add'?'on':''}">＋ポイント追加</button><button id="g_dp" class="${G.pm=='del'?'on':''}">－ポイント削除</button></div><div class="row">文字<textarea id="g_tx" rows="2" style="width:150px">${esc(it.txt||'')}</textarea></div><div class="row">サイズ<input id="g_tfs" type="range" min="4" max="120" value="${it.tfs||14}" style="width:100px"><input id="g_tfn" type="number" min="4" max="400" value="${it.tfs||14}" style="width:52px"><input type="color" id="g_tc" value="${it.tc||'#111111'}"><label><input type="checkbox" id="g_tb" ${it.tbo!==false?'checked':''}>太字</label><button id="g_tr0">位置リセット</button></div><div class="small">頂点●ドラッグで変形/辺上・頂点をダブルクリックでも追加・削除/本体ドラッグで移動</div>`+dupb;
+ else{P.innerHTML=`<b>${it.name}</b><div class="row"><label><input type="checkbox" id="g_fill" ${it.fill?'checked':''}>塗りつぶし</label><input type="color" id="g_fc" value="${it.fc}"></div><div class="row">透過<input id="g_tr" type="range" min="0" max="100" value="${Math.round((1-it.fo)*100)}" style="width:110px"><span id="g_trv" class="small">${Math.round((1-it.fo)*100)}%</span></div><div class="row"><label><input type="checkbox" id="g_bd" ${it.bd?'checked':''}>枠線</label><input type="color" id="g_sc" value="${it.sc}">太さ<input id="g_lw" type="number" min="0.5" max="20" step="0.5" value="${it.lw}" style="width:52px"></div><div class="row"><button id="g_add" class="${G.pm=='add'?'on':''}">＋ポイント追加</button><button id="g_dp" class="${G.pm=='del'?'on':''}">－ポイント削除</button></div><div class="row">文字<textarea id="g_tx" rows="2" style="width:150px">${esc(it.txt||'')}</textarea></div><div class="row">サイズ<input id="g_tfs" type="range" min="4" max="300" value="${it.tfs||35}" style="width:100px"><input id="g_tfn" type="number" min="4" max="600" value="${it.tfs||35}" style="width:52px"><input type="color" id="g_tc" value="${it.tc||'#111111'}"><label><input type="checkbox" id="g_tb" ${it.tbo!==false?'checked':''}>太字</label><button id="g_tr0">位置リセット</button></div><div class="small">頂点●ドラッグで変形/辺上・頂点をダブルクリックでも追加・削除/本体ドラッグで移動</div>`+dupb;
   const set=(k,v)=>{it[k]=v;GD[k]=v;draw()};q('#g_fill').onchange=e=>set('fill',e.target.checked);q('#g_fc').oninput=e=>set('fc',e.target.value);q('#g_tr').oninput=e=>{q('#g_trv').textContent=e.target.value+'%';set('fo',1-e.target.value/100)};q('#g_bd').onchange=e=>set('bd',e.target.checked);q('#g_sc').oninput=e=>set('sc',e.target.value);q('#g_lw').onchange=e=>set('lw',Math.max(.5,+e.target.value||2));
-  q('#g_tx').oninput=e=>{it.txt=e.target.value;drawRaf()};q('#g_tx').onchange=()=>{draw();props()};const tf=v=>{v=Math.max(4,Math.min(400,+v||14));it.tfs=v;q('#g_tfs').value=v;q('#g_tfn').value=v;draw()};q('#g_tfs').oninput=e=>tf(e.target.value);q('#g_tfn').onchange=e=>tf(e.target.value);q('#g_tc').oninput=e=>{it.tc=e.target.value;draw()};q('#g_tb').onchange=e=>{it.tbo=e.target.checked;draw()};q('#g_tr0').onclick=()=>{it.tp=null;draw()};
+  q('#g_tx').oninput=e=>{it.txt=e.target.value;drawRaf()};q('#g_tx').onchange=()=>{draw();props()};const tf=v=>{v=Math.max(4,Math.min(600,+v||35));it.tfs=v;q('#g_tfs').value=v;q('#g_tfn').value=v;draw()};q('#g_tfs').oninput=e=>tf(e.target.value);q('#g_tfn').onchange=e=>tf(e.target.value);q('#g_tc').oninput=e=>{it.tc=e.target.value;draw()};q('#g_tb').onchange=e=>{it.tbo=e.target.checked;draw()};q('#g_tr0').onclick=()=>{it.tp=null;draw()};
   q('#g_add').onclick=()=>{G.pm=G.pm=='add'?null:'add';G.tool=null;ui();props()};q('#g_dp').onclick=()=>{G.pm=G.pm=='del'?null:'del';G.tool=null;ui();props()}}
  q('#g_dup').onclick=()=>paste(it);q('#g_del').onclick=del};
 // ---- 作図
-const mkPoly=(pts,name)=>({id:S.uid++,k:'g',ty:'poly',name:name||'多角形',x:0,y:0,pts:pts.map(p=>({x:p.x,y:p.y})),txt:'',tfs:14,tc:'#111111',tbo:true,tp:null,...GD});
+const mkPoly=(pts,name)=>({id:S.uid++,k:'g',ty:'poly',name:name||'多角形',x:0,y:0,pts:pts.map(p=>({x:p.x,y:p.y})),txt:'',tfs:35,t25:1,tc:'#111111',tbo:true,tp:null,...GD});
 function add(it){S.items.push(it);S.sel=it.id;stop();draw();props()}
 function pv(){const o=document.getElementById('gpv');if(o)o.remove();const c=G.cur;if(!c)return;const k=z(),w=1.6/k;let h='';
  if(c.t=='poly'){const P=c.pts.concat(G.mp?[G.mp]:[]);h=`<path d="M${P.map(p=>p.x+' '+p.y).join('L')}${P.length>2?'Z':''}" fill="${GD.fc}" fill-opacity="${GD.fo*.6}" stroke="${GD.sc}" stroke-width="${w}" stroke-dasharray="${5*w} ${3*w}"/>`+c.pts.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="${(i?3:5)/k}" fill="#fff" stroke="#f59e0b" stroke-width="${w}"/>`).join('')}
