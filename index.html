@@ -1602,7 +1602,7 @@ function sheetCanvas(K,ui){
  x.strokeStyle='#1e2d33';x.lineWidth=1.6;x.strokeRect(FX,yW,FW,FHW);x.strokeRect(FX,yD,FW,FHD);
  if(I&&I.w&&I.d&&G){const F=wideRect(),rx=F.x,ry=F.y,rw=F.w,rh=F.h;
   x.strokeStyle='#e11d1d';x.lineWidth=1.3;x.strokeRect(rx,ry,rw,rh);x.beginPath();x.moveTo(rx,ry+rh);x.lineTo(FX,yD);x.moveTo(rx+rw,ry+rh);x.lineTo(FX+FW,yD);x.stroke();
-  if(ui){const kk=(q('#rdcv').clientWidth||595.28)/595.28,hs=5/kk;x.save();x.fillStyle='#fff';x.strokeStyle='#e11d1d';x.lineWidth=1.4/kk;
+  if(ui){const pv=q('#rdpv'),kk=Math.max(.3,Math.min(Math.max(50,pv.clientWidth-24)/595.28,Math.max(50,pv.clientHeight-24)/841.89)*PZ),hs=Math.max(1.5,Math.min(4/kk,rw/5,rh/5));x.save();x.fillStyle='#fff';x.strokeStyle='#e11d1d';x.lineWidth=Math.min(1.2/kk,1.5);
    [[rx,ry],[rx+rw,ry],[rx,ry+rh],[rx+rw,ry+rh]].forEach(c=>{x.fillRect(c[0]-hs,c[1]-hs,hs*2,hs*2);x.strokeRect(c[0]-hs,c[1]-hs,hs*2,hs*2)});x.restore()}}
  x.fillStyle='#111';x.font='bold 14px '+FFN;x.textAlign='left';x.lineJoin='round';x.lineWidth=4;x.strokeStyle='#fff';
  x.strokeText('広域図',FX+2,y0);x.fillText('広域図',FX+2,y0);x.strokeText('詳細位置図',FX+2,yDl);x.fillText('詳細位置図',FX+2,yDl);
@@ -1711,7 +1711,7 @@ function edOverlay(x,P){
  const kk=()=>(cv.clientWidth||595.28)/595.28;
  function hit(e){
   if(md!=='P'||stg!==2||!posImgs||!posImgs.d||!posImgs.w||ED.draw||ED.mode==='poly')return null;
-  const F=wideRect();if(!F)return null;const p=toPt(e),tol=(e.pointerType==='touch'?20:11)/kk();
+  const F=wideRect();if(!F)return null;const p=toPt(e),tol=Math.min((e.pointerType==='touch'?20:11)/kk(),F.w/3);
   for(const c of [[-1,-1,F.x,F.y],[1,-1,F.x+F.w,F.y],[-1,1,F.x,F.y+F.h],[1,1,F.x+F.w,F.y+F.h]])
    if(Math.hypot(p[0]-c[2],p[1]-c[3])<=tol)return{t:'c',hx:c[0],hy:c[1],F,p};
   if(p[0]>=F.x&&p[0]<=F.x+F.w&&p[1]>=F.y&&p[1]<=F.y+F.h)return{t:'m',F,p};
