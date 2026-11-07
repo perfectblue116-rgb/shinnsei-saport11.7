@@ -1226,6 +1226,7 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
    <button id="rdpback">← 位置図に戻る</button>
   </span>
   <span class="rdg" id="rdv1">
+   <label title="線画の元データ。国土地理院=基盤地図情報(道路縁・建物など)。取得できないときはOpenStreetMapで自動作成します">データ<select id="rdsrc"><option value="gsi" selected>国土地理院</option><option value="osm">OpenStreetMap</option></select></label>
    <button id="rdsel" class="pri" title="地図上をドラッグして、PDF(A3横)に出力する範囲を囲みます">PDF出力範囲指定</button>
    <label>縮尺<select id="rdsc"><option value="0">自由(囲んだ範囲に合わせる)</option><option value="100">1/100固定</option><option value="150">1/150固定</option><option value="200">1/200固定</option><option value="250">1/250固定</option><option value="300">1/300固定</option><option value="500">1/500固定</option><option value="1000">1/1000固定</option></select></label>
   </span>
@@ -1365,7 +1366,7 @@ async function confirmSel(){
  N=N<100?Math.max(30,Math.round(N)):Math.round(N/10)*10;
  if(N>5000){st('範囲が広すぎます(縮尺 1/5000 を超えます)。地図を拡大して、囲み直してください。','err');return}
  geo={lat0,lon0,N};busy=true;st('線画データを取得中です…(数秒〜十数秒かかります)');
- try{osm=await fetchOsm(geo)}catch(err){busy=false;st('道路・建物データを取得できませんでした('+(err&&err.message||err)+')。時間をおいてもう一度お試しください。','err');return}
+ try{osm=await fetchBase(geo)}catch(err){busy=false;st('道路・建物データを取得できませんでした('+(err&&err.message||err)+')。時間をおいてもう一度お試しください。','err');return}
  busy=false;view(2);renderPreview()}
 // ---- 道路・建物データ取得(OpenStreetMap / Overpass)
 async function fetchOsm(g,wide){
@@ -1390,6 +1391,113 @@ function overpassRace(qq){return new Promise((resolve,reject)=>{
   .then(el=>{clearTimeout(to);if(done)return;done=true;acs.forEach(a=>{try{a.abort()}catch(e){}});resolve(el)})
   .catch(e=>{clearTimeout(to);lastErr=e;fails++;if(done)return;if(fails>=EP.length)reject(lastErr||new Error('不明なエラー'));else launch()})};
  launch()})}
+
+// ---- 国土地理院ベクトルタイル(最適化ベクトルタイル optimal_bvmap-v1: 基盤地図情報の道路縁・建物・水域・軌道)
+const GSIZ=16,GSIURL='https://cyberjapandata.gsi.go.jp/xyz/optimal_bvmap-v1/';
+function gbox(g){const hw=(g.mw||g.N*PW)/2,hh=hw*(g.asp||RAT),pad=1.06,k=1/(R*Math.cos(rad(g.lat0))),cy=myU(g.lat0);
+ const dl=deg(hw*pad*k);return{s:latU(cy-hh*pad*k),n:latU(cy+hh*pad*k),w:g.lon0-dl,e:g.lon0+dl}}
+// 最小限の Mapbox Vector Tile デコーダ
+function mvtDecode(ab){const b=new Uint8Array(ab),dv=new DataView(ab);let p=0;
+ const vi=()=>{let r=0,m=1,c;do{c=b[p++];r+=(c&127)*m;m*=128}while(c&128);return r};
+ const each=(end,f)=>{while(p<end){const k=vi();f(k>>>3,k&7)}};
+ const skip=w=>{if(w===0)vi();else if(w===1)p+=8;else if(w===2){const l=vi();p+=l}else if(w===5)p+=4;else throw new Error('pbf')};
+ const str=l=>{const t=new TextDecoder().decode(b.subarray(p,p+l));p+=l;return t};
+ const layers={};
+ each(b.length,(t,w)=>{
+  if(t===3&&w===2){const L=vi(),end=p+L,lay={name:'',ext:4096,keys:[],vals:[],feats:[]};
+   each(end,(t2,w2)=>{
+    if(t2===1&&w2===2)lay.name=str(vi());
+    else if(t2===2&&w2===2){const fl=vi(),fe=p+fl,f={type:0,tags:[],geom:[]};
+     each(fe,(t3,w3)=>{
+      if(t3===3&&w3===0)f.type=vi();
+      else if(t3===2&&w3===2){const l=vi(),e=p+l;while(p<e)f.tags.push(vi())}
+      else if(t3===4&&w3===2){const l=vi(),e=p+l;while(p<e)f.geom.push(vi())}
+      else skip(w3)});
+     lay.feats.push(f)}
+    else if(t2===3&&w2===2)lay.keys.push(str(vi()));
+    else if(t2===4&&w2===2){const l=vi(),e=p+l;let v=null;
+     each(e,(t4,w4)=>{
+      if(t4===1&&w4===2)v=str(vi());
+      else if(t4===2&&w4===5){v=dv.getFloat32(p,true);p+=4}
+      else if(t4===3&&w4===1){v=dv.getFloat64(p,true);p+=8}
+      else if((t4===4||t4===5)&&w4===0)v=vi();
+      else if(t4===6&&w4===0){const z=vi();v=z%2?-(z+1)/2:z/2}
+      else if(t4===7&&w4===0)v=!!vi();
+      else skip(w4)});
+     lay.vals.push(v)}
+    else if(t2===5&&w2===0)lay.ext=vi();
+    else skip(w2)});
+   layers[lay.name]=lay}
+  else skip(w)});
+ return layers}
+function mvtGeom(f){const g=f.geom,out=[];let i=0,x=0,y=0,cur=null;
+ const zz=v=>(v>>>1)^-(v&1);
+ while(i<g.length){const c=g[i++],cmd=c&7,n=c>>>3;
+  if(cmd===1){for(let k=0;k<n;k++){x+=zz(g[i++]);y+=zz(g[i++]);cur=[[x,y]];out.push(cur)}}
+  else if(cmd===2){for(let k=0;k<n;k++){x+=zz(g[i++]);y+=zz(g[i++]);cur.push([x,y])}}
+  else if(cmd===7){if(cur)cur.push(cur[0].slice())}
+  else break}
+ return out}
+const ringArea=r=>{let a=0;for(let i=0;i<r.length-1;i++)a+=r[i][0]*r[i+1][1]-r[i+1][0]*r[i][1];return a/2};
+// タイルの境界線(クリップ辺)に載った辺は輪郭線から除く(タイル継ぎ目に線が出ないようにする)
+function gsiPoly(els,rings,tags,lt,conv,bd){
+ const groups=[];let sg=0;
+ for(const r of rings){if(r.length<4)continue;const a=ringArea(r);if(!a)continue;if(!sg)sg=Math.sign(a);if(Math.sign(a)===sg)groups.push([r]);else if(groups.length)groups[groups.length-1].push(r)}
+ for(const gr of groups){
+  if(gr.length===1)els.push({type:'way',tags:Object.assign({ns:'1'},tags),geometry:gr[0].map(conv)});
+  else els.push({type:'relation',tags:Object.assign({ns:'1'},tags),members:gr.map((r,i)=>({type:'way',role:i?'inner':'outer',geometry:r.map(conv)}))});
+  for(const r of gr){let pc=[];
+   const fl=()=>{if(pc.length>1)els.push({type:'way',tags:{gsi:lt},geometry:pc.map(conv)});pc=[]};
+   for(let i=0;i<r.length-1;i++){const a=r[i],b=r[i+1],on=bd.some(v=>(a[0]===v&&b[0]===v)||(a[1]===v&&b[1]===v));
+    if(on)fl();else{if(!pc.length)pc.push(a);pc.push(b)}}
+   fl()}}}
+async function fetchGsi(g){
+ const B=gbox(g),n2=Math.pow(2,GSIZ),
+  tx=lon=>Math.floor((lon+180)/360*n2),ty=lat=>Math.floor((1-Math.log(Math.tan(rad(lat))+1/Math.cos(rad(lat)))/Math.PI)/2*n2),
+  x0=tx(B.w),x1=tx(B.e),y0=ty(B.n),y1=ty(B.s);
+ if((x1-x0+1)*(y1-y0+1)>49)throw new Error('範囲が広すぎます');
+ const jobs=[];
+ for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)jobs.push((async()=>{
+  const ac=new AbortController(),to=setTimeout(()=>ac.abort(),20000);
+  try{const r=await fetch(GSIURL+GSIZ+'/'+x+'/'+y+'.pbf',{signal:ac.signal});
+   if(r.status===404)return null;if(!r.ok)throw new Error('HTTP '+r.status);
+   return{x,y,L:mvtDecode(await r.arrayBuffer())}}finally{clearTimeout(to)}})());
+ const tiles=(await Promise.all(jobs)).filter(Boolean),els=[];let nRoad=0,nBld=0;
+ const LAYN={};
+ for(const t of tiles)for(const nm in t.L)LAYN[nm.toLowerCase()]=nm;
+ for(const t of tiles){
+  const conv0=E=>(p=>{const u=(t.x+p[0]/E)/n2,v=(t.y+p[1]/E)/n2;return{lat:deg(Math.atan(Math.sinh(Math.PI*(1-2*v)))),lon:u*360-180}});
+  for(const nm in t.L){const lay=t.L[nm],E=lay.ext||4096,conv=conv0(E),key=nm.toLowerCase();
+   const isRd=key==='rdedg',isBld=key==='blda',isWa=key==='wa',isRail=key==='railcl';
+   if(!(isRd||isBld||isWa||isRail))continue;
+   const bd=[0,E];let mn=0,mx=E;
+   for(const f of lay.feats)for(const part of mvtGeom(f))for(const p of part){if(p[0]<mn)mn=p[0];if(p[1]<mn)mn=p[1];if(p[0]>mx)mx=p[0];if(p[1]>mx)mx=p[1]}
+   if(mn<0)bd.push(mn);if(mx>E)bd.push(mx);
+   for(const f of lay.feats){const parts=mvtGeom(f);
+    if(f.type===2){if(!(isRd||isRail))continue;
+     for(const ln of parts)if(ln.length>1){els.push({type:'way',tags:{gsi:isRd?'road':'rail'},geometry:ln.map(conv)});if(isRd)nRoad++}}
+    else if(f.type===3){
+     if(isBld){gsiPoly(els,parts,{building:'yes'},'bldl',conv,bd);nBld++}
+     else if(isWa)gsiPoly(els,parts,{natural:'water'},'wal',conv,bd)}}}}
+ if(!nRoad)throw new Error('道路縁のデータが見つかりません(レイヤー: '+(Object.values(LAYN).join(',')||'なし')+')');
+ return els}
+// 施設名(任意): OpenStreetMapから名前だけ取得。失敗しても線画は作る
+async function fetchNames(g){
+ const B=gbox(g),bb=[B.s,B.w,B.n,B.e].map(v=>v.toFixed(6)).join(',');
+ const nd=['amenity','shop','tourism','office','leisure'].map(t=>`node["name"]["${t}"](${bb});`).join('');
+ const el=await overpassRace(`[out:json][timeout:25];(${nd}way["building"]["name"](${bb}););out center qt;`);
+ const out=[];for(const e of el){const t=e.tags||{};if(!t.name)continue;
+  if(e.type==='node'&&e.lat!=null)out.push({type:'node',lat:e.lat,lon:e.lon,tags:t});
+  else if(e.type==='way'&&e.center)out.push({type:'node',lat:e.center.lat,lon:e.center.lon,tags:{name:t.name}})}
+ return out}
+async function fetchBase(g){
+ if(q('#rdsrc').value==='gsi'){
+  try{const els=await fetchGsi(g);g.src='gsi';g.nm=false;
+   st('施設名を取得中…');
+   try{const nm=await Promise.race([fetchNames(g),new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),12000))]);if(nm.length){els.push(...nm);g.nm=true}}catch(e){}
+   return els}
+  catch(e){st('国土地理院のデータを取得できなかったため(' +(e&&e.message||e)+')、OpenStreetMapで作成します…','err')}}
+ g.src='osm';g.nm=false;return fetchOsm(g)}
 function buildRings(rel){
  const key=p=>p[0].toFixed(7)+','+p[1].toFixed(7),pool=[];
  for(const m of rel.members||[]){if(m.type==='way'&&m.geometry&&(m.role==='outer'||m.role==='inner'||!m.role)){const pts=m.geometry.filter(p=>p&&p.lat!=null).map(p=>[p.lat,p.lon]);if(pts.length>1)pool.push(pts)}}
@@ -1428,12 +1536,13 @@ function render(ctx,Wpx,els,g,o){
  const A3W=o.pw||1190.55,A3H=o.ph||841.89,k=Wpx/A3W;ctx.setTransform(k,0,0,k,0,0);ctx.fillStyle='#fff';ctx.fillRect(0,0,A3W,A3H);
  const mt=R*Math.cos(rad(g.lat0)),ppm=A3W/(g.mw||g.N*PW),cx=rad(g.lon0),cy=myU(g.lat0);
  const P=(la,lo)=>[A3W/2+(rad(lo)-cx)*mt*ppm,A3H/2-(myU(la)-cy)*mt*ppm];
- const bl=[],rd=[],fp=[],rw=[],wl=[],wp=[],pn=[],sd=[],zb=[];
+ const bl=[],rd=[],fp=[],rw=[],wl=[],wp=[],pn=[],sd=[],zb=[],ge=[],bll=[],wll=[];
  for(const e of els){const t=e.tags||{};
   if(e.type==='node'){if(t.name&&!POIX.has(t.amenity)&&e.lat!=null)pn.push({p:P(e.lat,e.lon),n:t.name});continue}
   if(e.type==='way'){const pts=(e.geometry||[]).filter(p=>p&&p.lat!=null).map(p=>P(p.lat,p.lon));if(pts.length<2)continue;
-   if(t.building){bl.push({rings:[pts],name:t.name});continue}
-   if(t.waterway==='riverbank'||t.natural==='water'){wp.push({rings:[pts]});continue}
+   if(t.gsi){if(t.gsi==='road')ge.push(pts);else if(t.gsi==='rail')rw.push(pts);else if(t.gsi==='bldl')bll.push(pts);else if(t.gsi==='wal')wll.push(pts);continue}
+   if(t.building){bl.push({rings:[pts],name:t.name,ns:!!t.ns});continue}
+   if(t.waterway==='riverbank'||t.natural==='water'){wp.push({rings:[pts],ns:!!t.ns});continue}
    if(t.highway){if(t.area==='yes'||(t.tunnel&&t.tunnel!=='no'&&t.tunnel!=='building_passage'))continue;
     if(t.footway==='sidewalk'||t.highway==='sidewalk'){const sw=parseFloat(t.width);sd.push({pts,w:sw>0?Math.min(sw,6):2});continue}
     if(t.footway==='crossing'||t.highway==='crossing'){zb.push({pts});continue}
@@ -1442,12 +1551,15 @@ function render(ctx,Wpx,els,g,o){
    if(t.railway){rw.push(pts);continue}
    if(t.waterway&&!(t.tunnel&&t.tunnel!=='no'))wl.push({pts,w:waterW(t)});continue}
   if(e.type==='relation'){const rings=buildRings(e).map(r=>r.map(p=>P(p[0],p[1])));if(!rings.length)continue;
-   if(t.building)bl.push({rings,name:t.name});else wp.push({rings})}}
+   if(t.building)bl.push({rings,name:t.name,ns:!!t.ns});else wp.push({rings,ns:!!t.ns})}}
  ctx.save();ctx.beginPath();ctx.rect(0,0,A3W,A3H);ctx.clip();ctx.lineJoin='round';ctx.lineCap='butt';ctx.setLineDash([]);
  const pl=pts=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]))};
  const poly=rings=>{ctx.beginPath();for(const r of rings){r.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath()}};
  if(o.road){
-  for(const w of wp){poly(w.rings);ctx.fillStyle='#fff';ctx.fill('evenodd');ctx.strokeStyle='#444';ctx.lineWidth=.7;ctx.stroke()}
+  for(const w of wp){poly(w.rings);ctx.fillStyle='#fff';ctx.fill('evenodd');if(!w.ns){ctx.strokeStyle='#444';ctx.lineWidth=.7;ctx.stroke()}}
+  ctx.strokeStyle='#444';ctx.lineWidth=.7;for(const p of wll){pl(p);ctx.stroke()}
+  // 国土地理院: 道路縁(車道・歩道の境界線)
+  ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.8;for(const p of ge){pl(p);ctx.stroke()}
   const cor=rd.concat(wl).filter(c=>c.w*ppm>=1.6),thin=rd.concat(wl).filter(c=>c.w*ppm<1.6);
   if(o.sw!=='none'){const bands=sd.map(b=>({pts:b.pts,w:b.w}));
    for(const c of rd){if(c.w*ppm<1.6||!c.t)continue;const[L,Rr]=swSides(c.t,o.sw==='est');if(!L&&!Rr)continue;
@@ -1469,7 +1581,8 @@ function render(ctx,Wpx,els,g,o){
   ctx.strokeStyle='#222';ctx.lineWidth=1.5;for(const p of rw){pl(p);ctx.stroke()}
   ctx.strokeStyle='#fff';ctx.lineWidth=.9;ctx.setLineDash([5,5]);for(const p of rw){pl(p);ctx.stroke()}ctx.setLineDash([])}
  if(o.bld||o.fill){ctx.miterLimit=2;
-  for(const b of bl){poly(b.rings);ctx.fillStyle=o.fill?'#f1f1f1':'#fff';ctx.fill('evenodd');if(o.bld){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;ctx.stroke()}}}
+  for(const b of bl){poly(b.rings);ctx.fillStyle=o.fill?'#f1f1f1':'#fff';ctx.fill('evenodd');if(o.bld&&!b.ns){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;ctx.stroke()}}
+  if(o.bld){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;for(const p of bll){pl(p);ctx.stroke()}}}
  if(o.name){
   const fs=8.5,boxes=[];ctx.font=fs+'px "Yu Gothic","Hiragino Sans",Meiryo,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
   const cen=r=>{let a=0,x=0,y=0;for(let i=0;i<r.length;i++){const p=r[i],n=r[(i+1)%r.length],c=p[0]*n[1]-n[0]*p[1];a+=c;x+=(p[0]+n[0])*c;y+=(p[1]+n[1])*c}
@@ -1490,11 +1603,11 @@ function render(ctx,Wpx,els,g,o){
   const x0=34,y=A3H-34,L=4*u*ppm;ctx.save();ctx.strokeStyle='#222';ctx.fillStyle='#222';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x0+L,y);
   for(let i=0;i<=4;i++){ctx.moveTo(x0+i*u*ppm,y);ctx.lineTo(x0+i*u*ppm,y-(i%2?4:7))}ctx.stroke();
   ctx.font='bold 9px Arial,"Yu Gothic",sans-serif';ctx.textAlign='center';for(let i=0;i<=4;i++)if(u*ppm>=30||i%2==0)ctx.fillText(i?i*u+'m':'0',x0+i*u*ppm,y+12);ctx.restore()}
- if(o.attr){ctx.save();ctx.font='7px "Yu Gothic","Hiragino Sans",Meiryo,sans-serif';ctx.fillStyle='#555';ctx.textAlign='right';ctx.fillText('地図データ © OpenStreetMap contributors',A3W-10,A3H-8);ctx.restore()}
+ if(o.attr){ctx.save();ctx.font='7px "Yu Gothic","Hiragino Sans",Meiryo,sans-serif';ctx.fillStyle='#555';ctx.textAlign='right';ctx.fillText(g.src==='gsi'?'出典:国土地理院(基盤地図情報・最適化ベクトルタイル)'+(g.nm?' / 施設名:© OpenStreetMap contributors':''):'地図データ © OpenStreetMap contributors',A3W-10,A3H-8);ctx.restore()}
  ctx.setTransform(1,0,0,1,0,0)}
 const opts=()=>({name:q('#rdoName').checked,north:q('#rdoNorth').checked,fill:q('#rdoFill').checked,scale:q('#rdoScale').checked,road:q('#rdoRoad').checked,bld:q('#rdoBld').checked,attr:q('#rdoAttr').checked,sw:q('#rdoSw').value,zb:q('#rdoZb').checked,rs:Math.min(2,Math.max(.5,(+q('#rdoRs').value||100)/100))});
 function renderPreview(){if(!osm||!geo)return;const c=q('#rdcv'),W=1800;c.width=W;c.height=Math.round(W*A3H/A3W);render(c.getContext('2d'),W,osm,geo,opts());
- st('縮尺 1/'+geo.N+'(A3横 / 用紙の幅=実寸約'+Math.round(geo.N*PW)+'m)。表示を確認して「作図画面に反映」を押してください。','ok')}
+ st((geo.src==='gsi'?'[国土地理院] ':'[OpenStreetMap] ')+'縮尺 1/'+geo.N+'(A3横 / 用紙の幅=実寸約'+Math.round(geo.N*PW)+'m)。表示を確認して「作図画面に反映」を押してください。','ok')}
 // ---- 作図画面へ反映
 function applyToCanvas(){
  if(!osm||!geo)return;
