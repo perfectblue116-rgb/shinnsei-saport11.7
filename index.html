@@ -225,7 +225,9 @@ const T=[
 ['重機','bh1','バックホー 中型',6.6,2.6,'#ffb703'],
 ['重機','bh2','バックホー 大型',8.8,3.0,'#fb8500'],
 ['保安','cone','カラーコーン',0.8,1.31,'#e11d1d'],
-['保安','guard','ガードマン',1.0,1.81,'#2563eb']];
+['保安','guard','ガードマン',1.0,1.81,'#2563eb'],
+['歩行者施設','zebra','横断歩道',4,5.85,'#222'],['歩行者施設','bridge1','歩道橋1',2,13,'#0b3a4a'],['歩行者施設','bridge2','歩道橋2',14,12,'#0b3a4a']];
+const WALK=new Set(['zebra','bridge1','bridge2']);
 const S={items:[],sel:null,k:PT,mpp:PT*200,N:200,W:1190.55,H:841.89,zoom:1,mode:'sel',pts:[],cal:[],uid:1,pdf:null,drag:null};
 const sv=$('#sv'),cv=$('#cv'),wrap=$('#wrap'),stage=$('#stage');
 // ---- パレット
@@ -234,7 +236,7 @@ h+=`<button data-t="${i}"><span class="sw" style="background:${t[5]}"></span>${t
 $('#pal').onclick=e=>{const b=e.target.closest('button');if(!b)return;const t=T[b.dataset.t],r=wrap.getBoundingClientRect(),s=stage.getBoundingClientRect();
 if(t[1]=='cone'){coneToggle();return}const x=(r.left+r.width/2-s.left)/S.zoom,y=(r.top+r.height/2-s.top)/S.zoom;
 const sy=SYM[t[1]],pf=(sy&&sy.pv)||GPV[t[1]],L0=sy?sy.L:t[3],W0=sy?sy.W:t[4],it={id:S.uid++,k:'o',t:t[1],name:t[2],w:W0,l:L0,rad:DR[t[1]]||0,pv:pf?[(pf[0]-.5)*L0,(pf[1]-.5)*W0]:null,c:t[5],o:t[6]||null,sh:SHP[t[1]],x:Math.max(0,Math.min(S.W,x)),y:Math.max(0,Math.min(S.H,y)),a:0};
-S.items.push(it);S.sel=it.id;draw();props()};
+if(WALK.has(it.t))walkInit(it);S.items.push(it);S.sel=it.id;draw();props()};
 // ---- ページ・縮尺
 function setPage(W,H){S.W=W;S.H=H;sv.setAttribute('viewBox',`0 0 ${W} ${H}`);zoom()}
 function zoom(){stage.style.width=S.W*S.zoom+'px';stage.style.height=S.H*S.zoom+'px';if(typeof annZoomed=='function')annZoomed()}
@@ -349,9 +351,9 @@ for(const it of S.items){const on=sel&&it.id==S.sel;
 if(it.k=='g'){hw+=window.gSvg(it,on);if(on)ht+=window.gHdl(it);continue}if(it.k=='w'){hw+=window.wSvg(it,on);if(on)ht+=window.wHdl(it);continue}if(it.k=='n'){hn+=annSvg(it,on);if(on)ht+=annHdl(it);continue}
 if(it.k=='i'){if(it.front)hf+=imgSvg(it,on);else hb+=imgSvg(it,on);if(on)ht+=imgHdl(it);continue}
 if(it.k=='s'){h+=`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y})">${scafSvg(it)}${on?`<path d="M${it.pts.map(p=>p.x+' '+p.y).join('L')}Z" fill="none" stroke="#f59e0b" stroke-width="2.5" opacity=".7"/>`:''}</g>`;continue}
-if(it.k=='f'){hfe+=fenceSvg(it,on);if(on)ht+=fenceHdl(it);continue}if(it.t=='cone'){hc+=coneSvg(it,on);if(on)ht+=coneHdl(it);continue}if(it.tr&&it.tr.pts.length){htr+=trkSvg(it);if(on)ht+=trkHdl(it)}const w=it.l/m,hh=it.w/m;if(on&&it.t=='guard')ht+=szHdl(it,w,hh,0,0);let o='';
+if(it.k=='f'){hfe+=fenceSvg(it,on);if(on)ht+=fenceHdl(it);continue}if(it.t=='cone'){hc+=coneSvg(it,on);if(on)ht+=coneHdl(it);continue}if(it.tr&&it.tr.pts.length){htr+=trkSvg(it);if(on)ht+=trkHdl(it)}const w=it.l/m,hh=it.w/m;if(on&&(it.t=='guard'||WALK.has(it.t)))ht+=szHdl(it,w,hh,0,0);if(on&&WALK.has(it.t))ht+=walkHdl(it);let o='';
 if(it.o){const ow=it.o[0]/m,oh=it.o[1]/m;o=`<rect x="${-ow/2}" y="${-oh/2}" width="${ow}" height="${oh}" fill="none" stroke="${it.c}" stroke-dasharray="4 2" stroke-width="1"/>`}
-h+=`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a})">${SYM[it.t]?`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="transparent"/>`:''}${o}${SYM[it.t]?symSvg(it,w,hh,on):'<g transform="scale(-1 1)">'+shape(it,w,hh,on)+'</g>'}${itLabel(it,hh,on)}${radSvg(it,on)}${on?rotH(it,hh):''}</g>`}
+h+=`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a})">${SYM[it.t]?`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="transparent"/>`:''}${o}${WALK.has(it.t)?walkSvg(it,w,hh,on):(SYM[it.t]?symSvg(it,w,hh,on):'<g transform="scale(-1 1)">'+shape(it,w,hh,on)+'</g>')}${itLabel(it,hh,on)}${radSvg(it,on)}${on?rotH(it,hh):''}</g>`}
 h=hb+htr+h+hf+hfe+coneLines()+hc+conePrev(sel)+fencePrev(sel)+hw+hn+(window.wPrev?window.wPrev(sel):'');if(S.mode=='scaf'&&S.pts.length)h+=`<polyline points="${S.pts.map(p=>p.x+','+p.y).join(' ')}" fill="none" stroke="#f59e0b" stroke-width="1.5"/>`+S.pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="#f59e0b"/>`).join('')+(S.pts.length>=3?`<circle cx="${S.pts[0].x}" cy="${S.pts[0].y}" r="9" fill="none" stroke="#f59e0b" stroke-dasharray="2 2"/>`:'');
 if(S.mode=='cal')h+=S.cal.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="#e11d48"/>`).join('')+(S.cal.length==2?`<line x1="${S.cal[0].x}" y1="${S.cal[0].y}" x2="${S.cal[1].x}" y2="${S.cal[1].y}" stroke="#e11d48" stroke-width="1.5"/>`:'');
 h+=ht+measSvg();sv.innerHTML=h;sumup()}
@@ -366,9 +368,9 @@ if(window.wDown&&window.wDown(e,p))return;if(S.mode=='ann'){annDown(e,p);return}
 if(S.mode=='piv'){const i0=S.items.find(i=>i.id==S.sel);if(i0)i0.pv=toLoc(i0,p);S.mode='sel';mode();props();return}const hd=e.target.closest('[data-h]'),g0=e.target.closest('[data-id]');if(hd&&g0){const i1=S.items.find(i=>i.id==g0.dataset.id);if(i1){if(S.sel!=i1.id){S.sel=i1.id;draw();props()}S.drag={it:i1,h:hd.dataset.h,s0:{x:i1.x,y:i1.y,w:i1.w,h:i1.h},s1:{l:i1.l,w:i1.w},g0:annSnap(i1),p0:p,lb0:{x:i1.ldx||0,y:i1.ldy||0,f:i1.lfs||8}};sv.setPointerCapture(e.pointerId);return}}const g=e.target.closest('[data-id]');S.ss=null;if(g){const it=S.items.find(i=>i.id==g.dataset.id);S.sel=it.id;S.drag=it.k=='n'?{it,h:'an:mv',g0:annSnap(it),p0:p}:{it,dx:p.x-it.x,dy:p.y-it.y};sv.setPointerCapture(e.pointerId)}else{const sg=e.target.closest&&e.target.closest('[data-seg]');if(sg){coneSegDown(sg.dataset.seg,p,e);return}S.sel=null}draw();props()});
 let _raf=0;const drawRaf=()=>{if(_raf)return;_raf=requestAnimationFrame(()=>{_raf=0;draw()})};
 sv.addEventListener('pointermove',e=>{window.wMove&&window.wMove(e);if(S.mode=='meas'&&S.mp){S.hv=ortho(pt(e),e.shiftKey?S.mp:null);draw()}if(S.mode=='fence'&&S.fp&&S.fp.pts.length){const a=S.fp.pts[S.fp.pts.length-1];S.fv=ortho(pt(e),e.shiftKey?a:null);drawRaf();fenceInfo()}if(S.mode=='cone'&&S.cl){const a=conePos(S.cl.ids[S.cl.ids.length-1]);S.cv=ortho(pt(e),e.shiftKey&&a?a:null);draw();coneInfo()}const d=S.drag;if(!d)return;if(e.pointerType=='mouse'&&e.buttons==0){S.drag=null;return}const p=pt(e);if(d.sg){coneSegMove(d,p);return}const it=d.it;if(it.k=='g'&&d.h&&/^gv/.test(d.h)){window.gDrag(it,d,p);drawRaf();return}if(it.k=='w'&&d.h&&/^w[vl]/.test(d.h)){window.wDrag(it,d,p);drawRaf();return}if(it.k=='f'&&d.h&&/^f[vl]\d/.test(d.h)){fenceDrag(it,d,p);drawRaf();return}
-if(d.h=='rot'){let a=Math.atan2(p.y-it.y,p.x-it.x)*180/Math.PI+90;a=((a%360)+360)%360;if(e.shiftKey)a=Math.round(a/15)*15%360;else{const q=Math.round(a/90)*90;if(Math.abs(a-q)<3)a=q%360}it.a=Math.round(a*10)/10;const ai=document.querySelector('#props input[data-k=a]');if(ai)ai.value=it.a}else if(d.h=='lb'){it.ldx=Math.round((d.lb0.x+p.x-d.p0.x)*10)/10;it.ldy=Math.round((d.lb0.y+p.y-d.p0.y)*10)/10}else if(d.h=='lbs'){const f0=d.lb0.f,w0=lbW(it,f0),k=Math.max(.2,(w0+2*(p.x-d.p0.x))/w0);it.lfs=Math.round(Math.min(80,Math.max(3,f0*k))*10)/10;const fi=document.querySelector('#props input[data-k=lfs]');if(fi)fi.value=it.lfs}else if(d.h&&d.h.startsWith('an:'))annDrag(it,d,p,e);else if(d.h=='new')annNew(d,p,e);else if(d.h=='p')it.pv=toLoc(it,p);
+if(d.h=='rot'){let a=Math.atan2(p.y-it.y,p.x-it.x)*180/Math.PI+90;a=((a%360)+360)%360;if(e.shiftKey)a=Math.round(a/15)*15%360;else{const q=Math.round(a/90)*90;if(Math.abs(a-q)<3)a=q%360}it.a=Math.round(a*10)/10;const ai=document.querySelector('#props input[data-k=a]');if(ai)ai.value=it.a}else if(d.h&&/^st[tb]\d+$/.test(d.h))walkDrag(it,d,p,e);else if(d.h=='lb'){it.ldx=Math.round((d.lb0.x+p.x-d.p0.x)*10)/10;it.ldy=Math.round((d.lb0.y+p.y-d.p0.y)*10)/10}else if(d.h=='lbs'){const f0=d.lb0.f,w0=lbW(it,f0),k=Math.max(.2,(w0+2*(p.x-d.p0.x))/w0);it.lfs=Math.round(Math.min(80,Math.max(3,f0*k))*10)/10;const fi=document.querySelector('#props input[data-k=lfs]');if(fi)fi.value=it.lfs}else if(d.h&&d.h.startsWith('an:'))annDrag(it,d,p,e);else if(d.h=='new')annNew(d,p,e);else if(d.h=='p')it.pv=toLoc(it,p);
 else if(d.h&&d.h.startsWith('tp')){it.tr.pts[+d.h.slice(2)]=toLoc(it,p).map(v=>Math.round(v*10)/10)}
-else if(d.h&&d.h.startsWith('cz'))objResize(it,d,p,e.shiftKey);
+else if(d.h&&d.h.startsWith('cz'))objResize(it,d,p,e.shiftKey||WALK.has(it.t));
 else if(d.h&&d.h.startsWith('sz'))imgResize(it,d,p,e.shiftKey);
 else if(d.h=='r'){const a=it.a*Math.PI/180,c=Math.cos(a),n=Math.sin(a),px=it.pv[0]/S.mpp,py=it.pv[1]/S.mpp,wx=it.x+px*c-py*n,wy=it.y+px*n+py*c;it.rad=Math.min(RMAX[it.t]||999,Math.max(1,Math.round(Math.hypot(p.x-wx,p.y-wy)*S.mpp*2)/2));const r=$('#rad');if(r)r.value=it.rad}
 else{it.x=p.x-d.dx;it.y=p.y-d.dy;if(it.t=='cone')coneBend(it)}drawRaf()});
@@ -390,9 +392,52 @@ function conePos(id){const c=S.items.find(i=>i.id==id);return c?{x:c.x,y:c.y}:nu
 // a→b を等分(間隔は設定値以内。+10%まで許容)した点列。aは含まず、bを含む
 function segPts(a,b){const d=Math.hypot(b.x-a.x,b.y-a.y),sp=Math.max(300,+$('#csp').value||2000),n=Math.max(1,Math.ceil(d*S.mpp*1000/sp-.1)),r=[];for(let i=1;i<=n;i++)r.push({x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n});return r}
 
+
+// ---- 横断歩道・歩道橋(プロット用図形。名称は非表示。拡大縮小可。歩道橋の階段は360°回転・伸縮・位置移動できる)
+function walkInit(it){const sw=1.6;it.sw=sw;
+ if(it.t=='bridge1')it.st=[{e:'R',o:sw/2,a:0,len:3.6},{e:'R',o:-sw/2,a:0,len:3.6}];
+ else if(it.t=='bridge2'){it.dk=2;it.st=[{e:'L',o:sw/2,a:180,len:3.6},{e:'R',o:sw/2,a:0,len:3.6},{e:'L',o:-sw/2,a:180,len:3.6},{e:'R',o:-sw/2,a:0,len:3.6}]}}
+// 階段の付け根(桁の外周上)の位置[m]。o>=0 は始点から、o<0 は終点からの距離
+function stPos(it,q){const L=it.l,W=it.w,h=(q.e=='T'||q.e=='B'),o=q.o<0?(h?L:W)+q.o:q.o;
+ if(q.e=='T')return[-L/2+o,-W/2];if(q.e=='B')return[-L/2+o,W/2];if(q.e=='L')return[-L/2,-W/2+o];return[L/2,-W/2+o]}
+function walkSvg(it,w,hh,on){const m=S.mpp,k=1/m,ln='#0b3a4a',hit=`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="transparent"/>`;let s='';
+ if(it.t=='zebra'){const th=.45,pt=.9,n=Math.max(1,Math.floor((it.w-th)/pt+1e-6)+1),tot=(n-1)*pt+th,y0=-tot/2;
+  for(let i=0;i<n;i++)s+=`<rect x="${-w/2}" y="${(y0+i*pt)*k}" width="${w}" height="${Math.max(1.2,th*k)}" fill="#fff" stroke="#222" stroke-width=".7"/>`;
+  return hit+s+(on?`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="5 3" pointer-events="none"/>`:'')}
+ if(it.t=='bridge1')s+=`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="#fff" stroke="${ln}" stroke-width="1"/>`;
+ else{const dk=Math.max(.3,Math.min(it.dk||2,it.l/2-.2,it.w/2-.2))*k;
+  s+=`<path fill-rule="evenodd" fill="#fff" stroke="${ln}" stroke-width="1" d="M${-w/2} ${-hh/2}H${w/2}V${hh/2}H${-w/2}Z M${-w/2+dk} ${-hh/2+dk}V${hh/2-dk}H${w/2-dk}V${-hh/2+dk}Z"/>`}
+ const sw=(it.sw||1.6)*k;
+ (it.st||[]).forEach(q=>{const[px,py]=stPos(it,q),len=q.len*k;let tr='';const pitch=Math.max(.3*k,1.6);
+  for(let x=pitch;x<len-.5;x+=pitch)tr+=`<line x1="${x}" y1="${-sw/2}" x2="${x}" y2="${sw/2}" stroke="${ln}" stroke-width=".6"/>`;
+  s+=`<g transform="translate(${px*k} ${py*k}) rotate(${q.a})"><rect x="0" y="${-sw/2}" width="${len}" height="${sw}" fill="#fff" stroke="${ln}" stroke-width="1"/>${tr}</g>`});
+ return hit+s+(on?`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="none" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="5 3" pointer-events="none"/>`:'')}
+function walkHdl(it){if(!it.st||!it.st.length)return'';const k=1/S.mpp;let s='';
+ it.st.forEach((q,i)=>{const[px,py]=stPos(it,q),r=q.a*Math.PI/180,tx=px+Math.cos(r)*q.len,ty=py+Math.sin(r)*q.len;
+  s+=`<line x1="${px*k}" y1="${py*k}" x2="${tx*k}" y2="${ty*k}" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3 2" pointer-events="none"/>`;
+  s+=`<g data-h="stb${i}" style="cursor:move"><rect x="${px*k-11}" y="${py*k-11}" width="22" height="22" fill="transparent"/><rect x="${px*k-4}" y="${py*k-4}" width="8" height="8" fill="#fff" stroke="#f59e0b" stroke-width="1.5"/></g>`;
+  s+=`<g data-h="stt${i}" style="cursor:grab"><circle cx="${tx*k}" cy="${ty*k}" r="14" fill="transparent"/><circle cx="${tx*k}" cy="${ty*k}" r="6" fill="#f59e0b" stroke="#fff" stroke-width="1.2"/></g>`});
+ return `<g data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a||0})">${s}</g>`}
+function walkDrag(it,d,p,e){const m=S.mpp,a=(it.a||0)*Math.PI/180,c=Math.cos(a),n=Math.sin(a),dx=p.x-it.x,dy=p.y-it.y,lx=(dx*c+dy*n)*m,ly=(-dx*n+dy*c)*m,i=+d.h.slice(3),q=it.st&&it.st[i];if(!q)return;
+ if(d.h[2]=='t'){const[px,py]=stPos(it,q),vx=lx-px,vy=ly-py;let ang=Math.atan2(vy,vx)*180/Math.PI;ang=((ang%360)+360)%360;
+  if(e.shiftKey)ang=Math.round(ang/15)*15%360;else{const t=Math.round(ang/45)*45;if(Math.abs(ang-t)<3)ang=t%360}
+  q.a=Math.round(ang*10)/10;q.len=Math.round(Math.max(1,Math.min(60,Math.hypot(vx,vy)))*10)/10}
+ else{const L=it.l,W=it.w,cd=[['T',Math.abs(ly+W/2),lx+L/2,L],['B',Math.abs(ly-W/2),lx+L/2,L],['L',Math.abs(lx+L/2),ly+W/2,W],['R',Math.abs(lx-L/2),ly+W/2,W]];
+  cd.sort((u,v)=>u[1]-v[1]);const ed=cd[0][0],sz=cd[0][3];let o=Math.round(Math.max(0,Math.min(sz,cd[0][2]))*10)/10;
+  const nq=o>sz/2?-Math.max(.01,sz-o):o;if(ed!=q.e)q.a={T:270,B:90,L:180,R:0}[ed];q.e=ed;q.o=nq}
+ document.querySelectorAll('#props input[data-st]').forEach(inp=>{const[j,kk]=inp.dataset.st.split(':'),qq=it.st[+j];if(qq)inp.value=qq[kk]})}
+function walkRows(it){if(it.t=='zebra')return`<div class="small">縞の太さ0.45m・間隔0.9mで、幅(m)に合わせて本数が増減します。四隅の■で拡大縮小、上の●で回転できます。</div>`;
+ const inp=(k,l,st)=>`${l}<input type="number" step="${st}" min="0.3" data-k="${k}" value="${it[k]||''}">`;
+ let h=`<div class="row">${inp('sw','階段幅','0.1')}m${it.t=='bridge2'?inp('dk','桁幅','0.1')+'m':''}</div>`;
+ (it.st||[]).forEach((q,i)=>{h+=`<div class="row">階段${i+1} 角度<input type="number" step="15" data-st="${i}:a" value="${q.a}">° 長さ<input type="number" step="0.5" min="0.5" data-st="${i}:len" value="${q.len}">m<button data-stdel="${i}">削除</button></div>`});
+ return h+`<div class="row"><button id="stadd">階段を追加</button></div><div class="small">階段は、先端の●をドラッグで360°回転・伸縮、付け根の■をドラッグで桁の外周に沿って移動できます(Shiftで15°刻み)。</div>`}
+function walkProps(it,P){
+ P.querySelectorAll('input[data-st]').forEach(inp=>inp.onchange=()=>{const[i,kk]=inp.dataset.st.split(':'),q=(it.st||[])[+i];if(!q)return;let v=+inp.value;if(kk=='a')v=((v%360)+360)%360;else v=Math.max(.5,v||.5);q[kk]=v;draw()});
+ P.querySelectorAll('[data-stdel]').forEach(b=>b.onclick=()=>{it.st.splice(+b.dataset.stdel,1);draw();props()});
+ const ad=P.querySelector('#stadd');if(ad)ad.onclick=()=>{(it.st=it.st||[]).push({e:'R',o:Math.round(it.w/2*10)/10,a:0,len:3.6});draw();props()}}
 // ---- 図形の名称(「ガードマン」など): ドラッグで移動、右端の●ドラッグまたは入力欄でサイズ変更(位置・サイズは図形ごとに保存)
 function lbW(it,f){let w=0;for(const ch of String(it.name||'')){w+=ch.charCodeAt(0)>255?f:f*.58}return Math.max(f,w)}
-function itLabel(it,hh,on){const f=it.lfs||8,y=(SYM[it.t]?-hh/2-3:2.2),w=lbW(it,f),hw=w/2,dx=it.ldx||0,dy=it.ldy||0;
+function itLabel(it,hh,on){if(WALK.has(it.t))return'';const f=it.lfs||8,y=(SYM[it.t]?-hh/2-3:2.2),w=lbW(it,f),hw=w/2,dx=it.ldx||0,dy=it.ldy||0;
  const hit=`<rect x="${-hw-2}" y="${y-f}" width="${w+4}" height="${f*1.3}" fill="transparent"/>`;
  const hdl=on?`<line x1="${-hw-2}" y1="${y+f*.3}" x2="${hw+2}" y2="${y+f*.3}" stroke="#f59e0b" stroke-width=".8" stroke-dasharray="2 2" pointer-events="none"/><g data-h="lbs" style="cursor:ew-resize"><circle cx="${hw+5}" cy="${y-f*.35}" r="10" fill="transparent"/><circle cx="${hw+5}" cy="${y-f*.35}" r="4" fill="#fff" stroke="#f59e0b" stroke-width="1.2"/></g>`:'';
  return `<g transform="rotate(${-it.a}) translate(${dx} ${dy})"><g data-h="lb" style="cursor:move">${hit}<text font-size="${f}" text-anchor="middle" y="${y}" fill="#111" paint-order="stroke" stroke="#fff" stroke-width="${Math.max(1.6,f*.2)}">${it.name}</text></g>${hdl}</g>`}
@@ -585,9 +630,9 @@ Object.keys(FT).forEach(ft=>{const pe=$('#fp_'+ft),ce=$('#fc_'+ft);
 // ---- プロパティ・集計
 function props(){const it=S.items.find(i=>i.id==S.sel),P=$('#props');$('#pbox').style.display=it&&it.k!='n'?'block':'none';annUI();window.wUI&&window.wUI();if(!it&&S.ss&&S.lines.some(l=>l.id==S.ss.l)){$('#pbox').style.display='block';P.innerHTML='<b>カラーコーン列</b><div class="row"><button id="bline">この列を全削除</button></div>';$('#bline').onclick=coneDelLine;return}if(!it||it.k=='n')return;if(it.k=='g'){window.gProps(it,P);return}if(it.k=='w'){window.wProps(it,P);return}if(it.k=='i'){propsImg(it,P);return}if(it.k=='f'){propsFence(it,P);return}
 const inp=(k,l,st='any')=>`${l}<input type="number" step="${st}" data-k="${k}" value="${it[k]}">`;
-P.innerHTML=`<b>${it.name}</b><div class="row">`+(it.k=='s'?inp('gap','離隔','0.05')+inp('wid','幅','0.05')+inp('lift','段高','0.1')+inp('h','高さ','0.5'):inp('l','長さm','0.1')+inp('w','幅m','0.1')+(it.t=='cone'?'':inp('a','角度°','5')))+`</div>`+(it.t=='cone'?'':`<div class="row">名称の文字<input type="number" step="1" min="3" max="80" data-k="lfs" value="${it.lfs||8}"><button id="blr">名称を元の位置・大きさに</button></div>`)+(PIV.has(it.t)&&it.pv?`<div class="row">作業半径<input id="rad" type="number" step="0.5" min="0" data-k="rad" value="${it.rad}" max="${RMAX[it.t]||''}" placeholder="${DR[it.t]}">m<button id="bpv" ${it.pvEdit?'':'hidden'}>旋回軸を指定</button></div><div class="row"><label><input type="checkbox" id="pvedit" style="width:auto" ${it.pvEdit?'checked':''}> 旋回軸の位置を調整する(通常は車両に固定)</label></div><div class="small">半径を入力(${RMAX[it.t]?'最大'+RMAX[it.t]+'m':'目安'+DR[it.t]+'m'})→円を表示。円は車両に固定され、車両の移動・回転に追従します。円の線(縁)をドラッグすると半径が伸び縮みします(ポンプ車は灰色の点線=最大半径まで)。旋回軸の位置を直すときだけ下のチェックを入れてください。赤丸のドラッグで半径変更(0で非表示)。</div>`:'')+`<div class="row"><button id="b90"${it.t=='cone'?' hidden':''}>90°回転</button><button id="bdup">複製</button><button id="bdel">削除</button>${it.t=='cone'?'<button id="bline">この列を全削除</button>':''}</div>`;
+P.innerHTML=`<b>${it.name}</b><div class="row">`+(it.k=='s'?inp('gap','離隔','0.05')+inp('wid','幅','0.05')+inp('lift','段高','0.1')+inp('h','高さ','0.5'):inp('l','長さm','0.1')+inp('w','幅m','0.1')+(it.t=='cone'?'':inp('a','角度°','5')))+`</div>`+(it.t=='cone'||WALK.has(it.t)?'':`<div class="row">名称の文字<input type="number" step="1" min="3" max="80" data-k="lfs" value="${it.lfs||8}"><button id="blr">名称を元の位置・大きさに</button></div>`)+(WALK.has(it.t)?walkRows(it):'')+(PIV.has(it.t)&&it.pv?`<div class="row">作業半径<input id="rad" type="number" step="0.5" min="0" data-k="rad" value="${it.rad}" max="${RMAX[it.t]||''}" placeholder="${DR[it.t]}">m<button id="bpv" ${it.pvEdit?'':'hidden'}>旋回軸を指定</button></div><div class="row"><label><input type="checkbox" id="pvedit" style="width:auto" ${it.pvEdit?'checked':''}> 旋回軸の位置を調整する(通常は車両に固定)</label></div><div class="small">半径を入力(${RMAX[it.t]?'最大'+RMAX[it.t]+'m':'目安'+DR[it.t]+'m'})→円を表示。円は車両に固定され、車両の移動・回転に追従します。円の線(縁)をドラッグすると半径が伸び縮みします(ポンプ車は灰色の点線=最大半径まで)。旋回軸の位置を直すときだけ下のチェックを入れてください。赤丸のドラッグで半径変更(0で非表示)。</div>`:'')+`<div class="row"><button id="b90"${it.t=='cone'?' hidden':''}>90°回転</button><button id="bdup">複製</button><button id="bdel">削除</button>${it.t=='cone'?'<button id="bline">この列を全削除</button>':''}</div>`;
 P.querySelectorAll('input').forEach(i=>i.onchange=()=>{let v=+i.value;if(it.pv&&(i.dataset.k=='l'||i.dataset.k=='w')&&it[i.dataset.k]>0&&v>0){it.pv[i.dataset.k=='l'?0:1]*=v/it[i.dataset.k]}if(i.dataset.k=='rad'&&RMAX[it.t]&&v>RMAX[it.t]){v=RMAX[it.t];i.value=v}it[i.dataset.k]=v;draw()});
-trkProps(it,P);if($('#blr'))$('#blr').onclick=()=>{delete it.ldx;delete it.ldy;delete it.lfs;draw();props()};$('#b90').onclick=()=>{if(it.k=='o'&&it.t!='cone'){it.a=(it.a+90)%360;draw();props()}};$('#bdel').onclick=del;if($('#bline'))$('#bline').onclick=coneDelLine;if($('#bpv'))$('#bpv').onclick=()=>{S.mode='piv';mode()};if($('#pvedit'))$('#pvedit').onchange=e=>{it.pvEdit=e.target.checked;draw();props()};
+trkProps(it,P);if(WALK.has(it.t))walkProps(it,P);if($('#blr'))$('#blr').onclick=()=>{delete it.ldx;delete it.ldy;delete it.lfs;draw();props()};$('#b90').onclick=()=>{if(it.k=='o'&&it.t!='cone'){it.a=(it.a+90)%360;draw();props()}};$('#bdel').onclick=del;if($('#bline'))$('#bline').onclick=coneDelLine;if($('#bpv'))$('#bpv').onclick=()=>{S.mode='piv';mode()};if($('#pvedit'))$('#pvedit').onchange=e=>{it.pvEdit=e.target.checked;draw();props()};
 $('#bdup').onclick=()=>{const c=JSON.parse(JSON.stringify(it));c.id=S.uid++;c.x+=15;c.y+=15;S.items.push(c);S.sel=c.id;draw();props()}}
 function del(){S.items=S.items.filter(i=>i.id!=S.sel);S.sel=null;draw();props()}
 function sumup(){const c={};let h='';S.items.forEach(i=>{if(i.k=='o')c[i.name]=(c[i.name]||0)+1});
@@ -786,7 +831,7 @@ function annToggle(k){if(k=='lock'){S.annLock=!S.annLock;annUI();return}const it
  document.querySelectorAll('[data-ann]').forEach(b=>b.onclick=()=>annTool(b.dataset.ann));
  $('#annClr').onclick=()=>{if(!S.items.some(i=>i.k=='n'))return;if(!confirm('注釈(文字・矢印・引出線・雲形)をすべて消去します。よろしいですか?'))return;annEditEnd();S.items=S.items.filter(i=>i.k!='n');S.sel=null;draw();props()}})();
 // ---- 車輛軌跡シミュレーション(前輪中心が経路をたどり、後輪が内輪差で追従する運動学モデル)
-const NOTRK=new Set(['cone','guard','toilet']);
+const NOTRK=new Set(['cone','guard','toilet','zebra','bridge1','bridge2']);
 function trkP(it){const L=it.l,t=it.tp||{};return{wb:t.wb||+(L*.55).toFixed(1),fo:t.fo!=null?t.fo:+(L*.15).toFixed(1),rmin:t.rmin||+(Math.max(3,L*.95)).toFixed(1)}}
 function trkW(it,x,y){const m=S.mpp,a=it.a*Math.PI/180,c=Math.cos(a),s=Math.sin(a);return{x:it.x+(x*c-y*s)/m,y:it.y+(x*s+y*c)/m}}
 function chaikin(p,n){for(let k=0;k<n;k++){const q=[p[0]];for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];q.push({x:.75*a.x+.25*b.x,y:.75*a.y+.25*b.y},{x:.25*a.x+.75*b.x,y:.25*a.y+.75*b.y})}q.push(p[p.length-1]);p=q}return p}
@@ -1262,6 +1307,7 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
    <label><input type="checkbox" id="rdoRoad" checked>道路線</label>
    <label title="歩道の帯を描きます。OSM情報=地図データに歩道の記載がある道路のみ。推定を含める=幹線道路(国道・県道・主要市道)は両側に歩道があるものとして描きます。【標準地図→線画変換のとき】「なし」以外は、標準地図にある歩道側の細い線をそのまま描きます">歩道<select id="rdoSw"><option value="gsi" selected>地理院+道路縁から推定</option><option value="est">OSM+推定</option><option value="osm">OSM情報のみ</option><option value="none">なし</option></select></label>
    <label title="道路縁から道路中心側へ平行移動する距離(歩道幅)。道路の片側幅員(縁〜中心線)がこの値未満の細い道には歩道線を描きません">歩道幅<input type="number" id="rdoSwW" value="2.5" min="1" max="6" step="0.5" style="width:50px">m 対象<input type="number" id="rdoSwM" value="4" min="2" max="15" step="0.5" style="width:50px">m以上</label><label><input type="checkbox" id="rdoZb" checked>横断歩道</label><label title="横断歩道の縞を、道路の線(道路縁)からこの距離だけ内側で止めます。歩道側にはみ出す場合は大きく、短すぎる場合は小さくします(0で線まで)">歩道側の余白<input type="number" id="rdoZbM" value="1.5" min="0" max="8" step="0.5" style="width:50px">m</label>
+   <button id="rdzbA" title="OSMに横断歩道のデータが無い場所で使います。プレビュー上で、道路を横切る向きに2点(道路の一方の端→反対の端)をクリックすると、その線に沿って横断歩道を描きます。続けて何本でも追加できます(Escで終了)">横断歩道を追加</button><button id="rdzbC" title="手動で追加した横断歩道をすべて消します">追加分を消す</button>
    <label title="道路幅が実際と違うときに、車道の幅をまとめて増減します">車道幅<input type="number" id="rdoRs" value="100" min="50" max="200" step="5" style="width:56px">%</label>
    <label><input type="checkbox" id="rdoBld" checked>建物線</label>
    <label><input type="checkbox" id="rdoAttr" checked>出典表示</label>
@@ -2146,6 +2192,26 @@ function pvZoom(nz,cx,cy){nz=Math.min(8,Math.max(.3,nz));if(Math.abs(nz-PZ)<1e-4
 function inDetail(e){if(md!=='P'||stg!==2||!LAYO)return false;const cv=q('#rdcv'),r=cv.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*595.28,py=(e.clientY-r.top)/r.height*841.89;
  return px>=LAYO.dx&&px<=LAYO.dx+LAYO.dw&&py>=LAYO.dy&&py<=LAYO.dy+LAYO.dh}
 q('#rdcv').addEventListener('click',e=>{if(inDetail(e)&&!(posImgs&&posImgs.d))startPick()});
+// ---- 横断歩道の手動追加(OSMにデータが無い場所用): プレビュー上で道路を横切る2点をクリック
+let ZBA=null;
+function zbaStop(msg){ZBA=null;const b=q('#rdzbA');if(b)b.classList.remove('on');if(msg)st(msg,'ok')}
+q('#rdzbA').onclick=()=>{if(!osm||!geo){st('先に範囲を指定して線画を作成してください。','err');return}
+ if(ZBA){zbaStop('横断歩道の追加を終了しました。');return}
+ ZBA={a:null};q('#rdzbA').classList.add('on');
+ st('横断歩道を引く向き(道路を横切る向き)に、道路の一方の端→反対の端の順に2点をクリックしてください。続けて追加できます(Escで終了)。','ok')};
+q('#rdzbC').onclick=()=>{if(!osm)return;const n=osm.length;osm=osm.filter(e=>!(e.tags&&e.tags.manual));if(osm.length!==n){renderPreview();st('手動で追加した横断歩道を消しました。','ok')}};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ZBA){e.stopPropagation();zbaStop('横断歩道の追加を終了しました。');if(osm&&geo)renderPreview()}},true);
+q('#rdcv').addEventListener('pointerdown',e=>{if(!ZBA||md!=='R'||stg!==2||e.button)return;e.stopPropagation();e.preventDefault()});
+q('#rdcv').addEventListener('click',e=>{if(!ZBA||md!=='R'||stg!==2||!osm||!geo)return;
+ const c=q('#rdcv'),r=c.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*A3W,y=(e.clientY-r.top)/r.height*A3H;
+ if(!ZBA.a){ZBA.a=[x,y];const k=c.width/A3W,cx2=c.getContext('2d');cx2.save();cx2.fillStyle='#e11d1d';cx2.beginPath();cx2.arc(x*k,y*k,5*k,0,7);cx2.fill();cx2.restore();st('始点を記録しました。反対側の端をクリックしてください(Escで終了)。','ok');return}
+ const a=ZBA.a;ZBA.a=null;
+ if(Math.hypot(x-a[0],y-a[1])<6){st('2点が近すぎます。道路の反対側の端をクリックしてください。','err');renderPreview();return}
+ const mt=R*Math.cos(rad(geo.lat0)),ppm=A3W/(geo.mw||geo.N*PW),cxr=rad(geo.lon0),cyr=myU(geo.lat0);
+ const ll=(px,py)=>({lat:latU(cyr+(A3H/2-py)/(mt*ppm)),lon:deg(cxr+(px-A3W/2)/(mt*ppm))});
+ osm.push({type:'way',tags:{highway:'footway',footway:'crossing',manual:'1'},geometry:[ll(a[0],a[1]),ll(x,y)]});
+ renderPreview();st('横断歩道を追加しました。続けて追加するか、Escで終了してください。「歩道側の余白」で端の位置を調整できます。','ok')});
+
 
 // ---- 詳細位置図の編集(工事規制範囲の多角形+塗り潰し)
 const ED={mode:null,draw:null,sel:null,drag:null,cur:null};let pid=0,raf=0;
