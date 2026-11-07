@@ -1236,8 +1236,8 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
    <label><input type="checkbox" id="rdoFill" checked>建物を塗る</label>
    <label><input type="checkbox" id="rdoScale" checked>縮尺を表示</label>
    <label><input type="checkbox" id="rdoRoad" checked>道路線</label>
-   <label title="歩道の帯を描きます。OSM情報=地図データに歩道の記載がある道路のみ。推定を含める=幹線道路(国道・県道・主要市道)は両側に歩道があるものとして描きます">歩道<select id="rdoSw"><option value="est" selected>OSM+推定</option><option value="osm">OSM情報のみ</option><option value="none">なし</option></select></label>
-   <label><input type="checkbox" id="rdoZb" checked>横断歩道</label>
+   <label title="歩道の帯を描きます。OSM情報=地図データに歩道の記載がある道路のみ。推定を含める=幹線道路(国道・県道・主要市道)は両側に歩道があるものとして描きます">歩道<select id="rdoSw"><option value="gsi" selected>地理院+道路縁から推定</option><option value="est">OSM+推定</option><option value="osm">OSM情報のみ</option><option value="none">なし</option></select></label>
+   <label title="道路縁から道路中心側へ平行移動する距離(歩道幅)。道路の片側幅員(縁〜中心線)がこの値未満の細い道には歩道線を描きません">歩道幅<input type="number" id="rdoSwW" value="2.5" min="1" max="6" step="0.5" style="width:50px">m 対象<input type="number" id="rdoSwM" value="4" min="2" max="15" step="0.5" style="width:50px">m以上</label><label><input type="checkbox" id="rdoZb" checked>横断歩道</label>
    <label title="道路幅が実際と違うときに、車道の幅をまとめて増減します">車道幅<input type="number" id="rdoRs" value="100" min="50" max="200" step="5" style="width:56px">%</label>
    <label><input type="checkbox" id="rdoBld" checked>建物線</label>
    <label><input type="checkbox" id="rdoAttr" checked>出典表示</label>
@@ -1467,27 +1467,30 @@ async function fetchGsi(g){
   try{const r=await fetch(GSIURL+GSIZ+'/'+x+'/'+y+'.pbf',{signal:ac.signal});
    if(r.status===404)return null;if(!r.ok)throw new Error('HTTP '+r.status);
    return{x,y,L:mvtDecode(await r.arrayBuffer())}}finally{clearTimeout(to)}})());
- const tiles=(await Promise.all(jobs)).filter(Boolean),els=[];let nRoad=0,nBld=0;
+ const tiles=(await Promise.all(jobs)).filter(Boolean),els=[];let nRoad=0,nBld=0,nAnno=0;
  const LAYN={},CNT={};
  for(const t of tiles)for(const nm in t.L){LAYN[nm.toLowerCase()]=nm;CNT[nm]=(CNT[nm]||0)+t.L[nm].feats.length}
  g.lay=Object.keys(CNT).map(k=>k+'('+CNT[k]+')').join(' ');
  for(const t of tiles){
   const conv0=E=>(p=>{const u=(t.x+p[0]/E)/n2,v=(t.y+p[1]/E)/n2;return{lat:deg(Math.atan(Math.sinh(Math.PI*(1-2*v)))),lon:u*360-180}});
   for(const nm in t.L){const lay=t.L[nm],E=lay.ext||4096,conv=conv0(E),key=nm.toLowerCase();
+   if(key==='anno'){for(const f of lay.feats){if(f.type!==1)continue;const pr={};for(let i=0;i+1<f.tags.length;i+=2)pr[lay.keys[f.tags[i]]]=lay.vals[f.tags[i+1]];
+     const nmv=String(pr.knj||'').trim();if(!nmv||/^[0-9.,\-]+$/.test(nmv))continue;const pt=mvtGeom(f)[0];if(!pt||!pt[0])continue;const ll=conv(pt[0]);els.push({type:'node',lat:ll.lat,lon:ll.lon,tags:{name:nmv,gsiAnno:'1'}});nAnno++}continue}
    // 道路縁(RdEdg)に加え、歩道・車道の境界などを持つ道路系レイヤー(道路構成線 RdCompt など。中心線 RdCL は除く)も線として拾う
-   const isRd=key==='rdedg',isRd2=!isRd&&/^rd/.test(key)&&key!=='rdcl',isBld=key==='blda',isWa=key==='wa',isRail=key==='railcl';
-   if(!(isRd||isRd2||isBld||isWa||isRail))continue;
+   const isRd=key==='rdedg',isRd2=!isRd&&/^rd/.test(key)&&key!=='rdcl',isBld=key==='blda',isWa=key==='wa',isRail=key==='railcl',isCL=key==='rdcl';
+   if(!(isRd||isRd2||isBld||isWa||isRail||isCL))continue;
    const bd=[0,E];let mn=0,mx=E;
    for(const f of lay.feats)for(const part of mvtGeom(f))for(const p of part){if(p[0]<mn)mn=p[0];if(p[1]<mn)mn=p[1];if(p[0]>mx)mx=p[0];if(p[1]>mx)mx=p[1]}
    if(mn<0)bd.push(mn);if(mx>E)bd.push(mx);
    for(const f of lay.feats){const parts=mvtGeom(f);
-    if(f.type===2){if(!(isRd||isRd2||isRail))continue;
-     for(const ln of parts)if(ln.length>1){els.push({type:'way',tags:{gsi:isRd?'road':isRd2?'road2':'rail'},geometry:ln.map(conv)});if(isRd||isRd2)nRoad++}}
+    if(f.type===2){if(!(isRd||isRd2||isRail||isCL))continue;
+     for(const ln of parts)if(ln.length>1){els.push({type:'way',tags:{gsi:isRd?'road':isRd2?'road2':isCL?'cl':'rail'},geometry:ln.map(conv)});if(isRd||isRd2)nRoad++}}
     else if(f.type===3){
      if(isRd||isRd2){for(const r of parts){let pc=[];const fl=()=>{if(pc.length>1){els.push({type:'way',tags:{gsi:isRd?'road':'road2'},geometry:pc.map(conv)});nRoad++}pc=[]};
        for(let i=0;i<r.length-1;i++){const a=r[i],b=r[i+1],on=bd.some(v=>(a[0]===v&&b[0]===v)||(a[1]===v&&b[1]===v));if(on)fl();else{if(!pc.length)pc.push(a);pc.push(b)}}fl()}continue}
      if(isBld){gsiPoly(els,parts,{building:'yes'},'bldl',conv,bd);nBld++}
      else if(isWa)gsiPoly(els,parts,{natural:'water'},'wal',conv,bd)}}}}
+ g.nAnno=nAnno;
  if(!nRoad)throw new Error('道路縁のデータが見つかりません(レイヤー: '+(Object.values(LAYN).join(',')||'なし')+')');
  return els}
 // 施設名(任意): OpenStreetMapから名前だけ取得。失敗しても線画は作る
@@ -1552,11 +1555,11 @@ function render(ctx,Wpx,els,g,o){
  const A3W=o.pw||1190.55,A3H=o.ph||841.89,k=Wpx/A3W;ctx.setTransform(k,0,0,k,0,0);ctx.fillStyle='#fff';ctx.fillRect(0,0,A3W,A3H);
  const mt=R*Math.cos(rad(g.lat0)),ppm=A3W/(g.mw||g.N*PW),cx=rad(g.lon0),cy=myU(g.lat0);
  const P=(la,lo)=>[A3W/2+(rad(lo)-cx)*mt*ppm,A3H/2-(myU(la)-cy)*mt*ppm];
- const bl=[],rd=[],fp=[],rw=[],wl=[],wp=[],pn=[],sd=[],zb=[],ge=[],ge2=[],bll=[],wll=[];
+ const cl=[],bl=[],rd=[],fp=[],rw=[],wl=[],wp=[],pn=[],sd=[],zb=[],ge=[],ge2=[],bll=[],wll=[];
  for(const e of els){const t=e.tags||{};
   if(e.type==='node'){if(t.name&&!POIX.has(t.amenity)&&e.lat!=null)pn.push({p:P(e.lat,e.lon),n:t.name});continue}
   if(e.type==='way'){const pts=(e.geometry||[]).filter(p=>p&&p.lat!=null).map(p=>P(p.lat,p.lon));if(pts.length<2)continue;
-   if(t.gsi){if(t.gsi==='road')ge.push(pts);else if(t.gsi==='road2')ge2.push(pts);else if(t.gsi==='rail')rw.push(pts);else if(t.gsi==='bldl')bll.push(pts);else if(t.gsi==='wal')wll.push(pts);continue}
+   if(t.gsi){if(t.gsi==='road')ge.push(pts);else if(t.gsi==='road2')ge2.push(pts);else if(t.gsi==='cl')cl.push(pts);else if(t.gsi==='rail')rw.push(pts);else if(t.gsi==='bldl')bll.push(pts);else if(t.gsi==='wal')wll.push(pts);continue}
    if(t.building){bl.push({rings:[pts],name:t.name,ns:!!t.ns});continue}
    if(t.waterway==='riverbank'||t.natural==='water'){wp.push({rings:[pts],ns:!!t.ns});continue}
    if(t.highway){if(t.area==='yes'||(t.tunnel&&t.tunnel!=='no'&&t.tunnel!=='building_passage'))continue;
@@ -1584,6 +1587,15 @@ function render(ctx,Wpx,els,g,o){
     if(L)bands.push({pts:offs(c.pts,off),w:sw});if(Rr)bands.push({pts:offs(c.pts,-off),w:sw})}
    ctx.strokeStyle='#555';for(const b of bands){ctx.lineWidth=b.w*ppm+1;pl(b.pts);ctx.stroke()}
    ctx.strokeStyle='#ededed';for(const b of bands){ctx.lineWidth=b.w*ppm;pl(b.pts);ctx.stroke()}}
+  if(o.sw==='gsi'&&cl.length){ // 地理院の道路縁を、道路中心線の側へ歩道幅ぶん平行移動して歩道線にする(推定)
+   const step=Math.max(1,3*ppm),dens=pts=>{const r=[pts[0]];for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1])/step));for(let k=1;k<=n;k++)r.push([a[0]+(b[0]-a[0])*k/n,a[1]+(b[1]-a[1])*k/n])}return r};
+   const dcl=(x,y)=>{let m=1e9;for(const c of cl)for(let i=0;i<c.length-1;i++){const a=c[i],b=c[i+1],dx=b[0]-a[0],dy=b[1]-a[1],l2=dx*dx+dy*dy;let t=l2?((x-a[0])*dx+(y-a[1])*dy)/l2:0;t=t<0?0:t>1?1:t;const d=Math.hypot(x-a[0]-t*dx,y-a[1]-t*dy);if(d<m)m=d}return m};
+   const dw=(o.swd||2.5)*ppm,minHalf=(o.swm||4)*ppm;ctx.strokeStyle='#555';ctx.lineWidth=.6;
+   for(const e of ge){if(e.length<2)continue;const pts=dens(e),mn=pts.map(q=>dcl(q[0],q[1]));
+    const A=offs(pts,dw),B=offs(pts,-dw);if(A.length!==pts.length)continue;
+    const ma=A.reduce((s2,q)=>s2+dcl(q[0],q[1]),0),mb=B.reduce((s2,q)=>s2+dcl(q[0],q[1]),0),O=ma<=mb?A:B;
+    let run=[];const fl=()=>{if(run.length>1){pl(run);ctx.stroke()}run=[]};
+    for(let i=0;i<pts.length;i++){if(mn[i]>=minHalf&&dcl(O[i][0],O[i][1])<mn[i])run.push(O[i]);else fl()}fl()}}
   if(g.src==='gsi'){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.8;for(const p of ge){pl(p);ctx.stroke()}ctx.strokeStyle='#555';ctx.lineWidth=.6;for(const p of ge2){pl(p);ctx.stroke()}}
   ctx.strokeStyle='#3a3a3a';for(const c of cor){ctx.lineWidth=c.w*ppm+1;pl(c.pts);ctx.stroke()}
   ctx.strokeStyle='#fff';for(const c of cor){ctx.lineWidth=c.w*ppm;pl(c.pts);ctx.stroke()}
@@ -1610,7 +1622,7 @@ function render(ctx,Wpx,els,g,o){
    ctx.lineWidth=3;ctx.strokeStyle='#fff';ctx.strokeText(n,p[0],p[1]);ctx.fillStyle='#222';ctx.fillText(n,p[0],p[1]);return true};
   const names=new Set();
   for(const b of bl){if(!b.name)continue;const big=b.rings.slice().sort((a,c)=>c.length-a.length)[0];if(put(cen(big),b.name))names.add(b.name)}
-  for(const p of pn){if(!names.has(p.n))put(p.p,p.n)}}
+  const seen=[];for(const p of pn){if(names.has(p.n))continue;if(seen.some(z=>z.n===p.n&&Math.hypot(z.p[0]-p.p[0],z.p[1]-p.p[1])<40))continue;seen.push(p);put(p.p,p.n)}}
  if(o.after)o.after(ctx,P,ppm);
  ctx.restore();ctx.setLineDash([]);ctx.textBaseline='alphabetic';
  if(o.north){ctx.save();ctx.translate(A3W-46,64);ctx.lineWidth=1.2;ctx.strokeStyle='#111';ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,23,0,7);ctx.fill();ctx.stroke();
@@ -1623,9 +1635,9 @@ function render(ctx,Wpx,els,g,o){
   ctx.font='bold 9px Arial,"Yu Gothic",sans-serif';ctx.textAlign='center';for(let i=0;i<=4;i++)if(u*ppm>=30||i%2==0)ctx.fillText(i?i*u+'m':'0',x0+i*u*ppm,y+12);ctx.restore()}
  if(o.attr){ctx.save();ctx.font='7px "Yu Gothic","Hiragino Sans",Meiryo,sans-serif';ctx.fillStyle='#555';ctx.textAlign='right';ctx.fillText(g.src==='gsi'?'出典:国土地理院(基盤地図情報・最適化ベクトルタイル)'+(g.nm?' / 施設名・歩道:© OpenStreetMap contributors':''):'地図データ © OpenStreetMap contributors',A3W-10,A3H-8);ctx.restore()}
  ctx.setTransform(1,0,0,1,0,0)}
-const opts=()=>({name:q('#rdoName').checked,north:q('#rdoNorth').checked,fill:q('#rdoFill').checked,scale:q('#rdoScale').checked,road:q('#rdoRoad').checked,bld:q('#rdoBld').checked,attr:q('#rdoAttr').checked,sw:q('#rdoSw').value,zb:q('#rdoZb').checked,rs:Math.min(2,Math.max(.5,(+q('#rdoRs').value||100)/100))});
+const opts=()=>({name:q('#rdoName').checked,north:q('#rdoNorth').checked,fill:q('#rdoFill').checked,scale:q('#rdoScale').checked,road:q('#rdoRoad').checked,bld:q('#rdoBld').checked,attr:q('#rdoAttr').checked,sw:q('#rdoSw').value,swd:+q('#rdoSwW').value||2.5,swm:+q('#rdoSwM').value||4,zb:q('#rdoZb').checked,rs:Math.min(2,Math.max(.5,(+q('#rdoRs').value||100)/100))});
 function renderPreview(){if(!osm||!geo)return;const c=q('#rdcv'),W=1800;c.width=W;c.height=Math.round(W*A3H/A3W);render(c.getContext('2d'),W,osm,geo,opts());
- st((geo.src==='gsi'?'[国土地理院] ':'[OpenStreetMap] ')+'縮尺 1/'+geo.N+'(A3横 / 用紙の幅=実寸約'+Math.round(geo.N*PW)+'m)。表示を確認して「作図画面に反映」を押してください。'+(geo.src==='gsi'?'  [歩道(OSM): '+(geo.swn||0)+'本'+(geo.swn?'':' ※該当地域のOSMに歩道の登録なし')+']':'')+(geo.src==='gsi'&&geo.lay?'  [取得データ: '+geo.lay+']':''),'ok')}
+ st((geo.src==='gsi'?'[国土地理院] ':'[OpenStreetMap] ')+'縮尺 1/'+geo.N+'(A3横 / 用紙の幅=実寸約'+Math.round(geo.N*PW)+'m)。表示を確認して「作図画面に反映」を押してください。'+(geo.src==='gsi'?'  [歩道(OSM): '+(geo.swn||0)+'本 / 施設名(地理院注記): '+(geo.nAnno||0)+'件]':'')+(geo.src==='gsi'&&geo.lay?'  [取得データ: '+geo.lay+']':''),'ok')}
 // ---- 作図画面へ反映
 function applyToCanvas(){
  if(!osm||!geo)return;
@@ -1946,7 +1958,7 @@ q('#rdgo').onclick=async()=>{const t=q('#rdq').value.trim();if(!t||!map)return;
   const c=j[0].geometry.coordinates;map.setView([c[1],c[0]],18);st('「'+((j[0].properties&&j[0].properties.title)||t)+'」付近を表示しました。')}
  catch(e){st('住所検索に失敗しました。ネットワーク接続を確認してください。','err')}};
 q('#rdq').onkeydown=e=>{if(e.key==='Enter')q('#rdgo').click()};
-['rdoName','rdoNorth','rdoFill','rdoScale','rdoRoad','rdoBld','rdoAttr','rdoSw','rdoZb','rdoRs'].forEach(i=>q('#'+i).onchange=renderPreview);
+['rdoName','rdoNorth','rdoFill','rdoScale','rdoRoad','rdoBld','rdoAttr','rdoSw','rdoSwW','rdoSwM','rdoZb','rdoRs'].forEach(i=>q('#'+i).onchange=renderPreview);
 q('#rdback').onclick=()=>{view(1);initMap();startSel()};
 q('#rdok').onclick=applyToCanvas;
 q('#blank').addEventListener('click',()=>{S.mapBg=null});
