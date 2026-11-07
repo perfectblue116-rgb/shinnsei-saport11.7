@@ -1573,6 +1573,20 @@ function rlRdp(pts,eps){
     for(let i=a+1;i<b;i++){const d=l<1e-9?Math.hypot(pts[i][0]-ax,pts[i][1]-ay):Math.abs(dy*pts[i][0]-dx*pts[i][1]+bx*ay-by*ax)/l;if(d>md){md=d;mi=i}}
     if(md>eps&&mi>0){keep[mi]=1;st.push([a,mi],[mi,b])}}
   return pts.filter((_,i)=>keep[i])}
+function rlFair(p,F){ // 角を保持した平滑化(ふにゃふにゃ防止)
+ if(p.length<3)return p;
+ let q=rlRdp(p,Math.max(.9,.8*F));
+ if(q.length<3)return q;
+ const n=q.length,cor=[0];
+ for(let i=1;i<n-1;i++){const a=q[i-1],b=q[i],c=q[i+1],
+  l1=Math.hypot(b[0]-a[0],b[1]-a[1]),l2=Math.hypot(c[0]-b[0],c[1]-b[1]);
+  if(l1<1.2*F||l2<1.2*F)continue;
+  let d=Math.abs(Math.atan2(c[1]-b[1],c[0]-b[0])-Math.atan2(b[1]-a[1],b[0]-a[0]));
+  if(d>Math.PI)d=2*Math.PI-d;if(d>.6)cor.push(i)}
+ cor.push(n-1);
+ const out=[];
+ for(let k=0;k<cor.length-1;k++){let sm=rlSmooth(q.slice(cor[k],cor[k+1]+1),3);if(k)sm=sm.slice(1);out.push(...sm)}
+ return out}
 function rlSmooth(pts,it){ // Chaikin(端点固定)
   let p=pts;for(let k=0;k<it;k++){if(p.length<3)break;const q=[p[0]];
     for(let i=0;i<p.length-1;i++){const a=p[i],b=p[i+1];q.push([a[0]*.75+b[0]*.25,a[1]*.75+b[1]*.25],[a[0]*.25+b[0]*.75,a[1]*.25+b[1]*.75])}
@@ -1627,7 +1641,7 @@ function rlVectorize(rgba,W,H,F,o){
   rlPrune(G,W,H,Math.round((o.minG||10)*F),{tw:Math.round((o.tw||16)*F),tr:o.tr||1.9});rlPrune(O,W,H,Math.round((o.minO||7)*F),{tw:Math.round((o.twO||12)*F),tr:0,both:1});
   const spur=Math.round((o.spur||1.6)*F),lines=[];
   const mk=(m,kind)=>{for(const p of rlTrace(m,W,H,spur)){if(p.length<2)continue;
-      let q=rlRdp(p,.9);q=rlSmooth(q,2);
+      let q=rlFair(p,F);
       let dk=0,c=0;for(let t=0;t<p.length;t+=2){const x=Math.round(p[t][0]-.5),y=Math.round(p[t][1]-.5);let mnv=255;
         for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<W&&yy<H){const v=V[yy*W+xx];if(v<mnv)mnv=v}}dk+=mnv;c++}
       lines.push({pts:q,k:kind,dk:c?dk/c:255,len:p.length})}};
@@ -1671,11 +1685,11 @@ async function fetchImg(g){
   if(!r.lines.length)throw new Error('線を検出できませんでした');
   const lines=r.lines.map(l=>({k:l.k==='g'?'edge':l.k,pts:l.pts.map(p=>[x0+p[0]/F,y0+p[1]/F])}));
   // 建物の塗り(輪郭の内側)。解像度を落として保持
-  const fw=Math.min(W,cw*2),fh=Math.min(H,ch*2),c0=document.createElement('canvas');c0.width=W;c0.height=H;
+  const fw=Math.min(W,cw*6),fh=Math.min(H,ch*6),c0=document.createElement('canvas');c0.width=W;c0.height=H;
   const f0=c0.getContext('2d'),fi=f0.createImageData(W,H),fd=fi.data,FLm=r.fill;
   for(let i=0,j=0;i<FLm.length;i++,j+=4)if(FLm[i]){fd[j]=fd[j+1]=fd[j+2]=241;fd[j+3]=255}
   f0.putImageData(fi,0,0);
-  const fc=document.createElement('canvas');fc.width=fw;fc.height=fh;const f1=fc.getContext('2d');f1.imageSmoothingEnabled=true;f1.imageSmoothingQuality='high';f1.drawImage(c0,0,0,W,H,0,0,fw,fh);
+  const fc=document.createElement('canvas');fc.width=fw;fc.height=fh;const f1=fc.getContext('2d');f1.imageSmoothingEnabled=true;f1.imageSmoothingQuality='high';f1.drawImage(c0,0,0,W,H,0,0,fw,fh);{const b=f1.getImageData(0,0,fw,fh),bd=b.data;for(let j=0;j<bd.length;j+=4){if(bd[j+3]>=128){bd[j]=bd[j+1]=bd[j+2]=241;bd[j+3]=255}else bd[j+3]=0}f1.putImageData(b,0,0)}
   c0.width=c0.height=1;c2.width=c2.height=1;
   g.imgz=z;g.nl=lines.length;
   return{type:'rimg',z,n,x0,y0,cw,ch,lines,fill:fc}}
@@ -1757,7 +1771,7 @@ function render(ctx,Wpx,els,g,o){
   for(const L of ri.lines){if(kinds.indexOf(L.k)<0)continue;L.pts.forEach((p,i)=>{const x=ax+p[0]*s,y=ay+p[1]*s;i?ctx.lineTo(x,y):ctx.moveTo(x,y)})}
   ctx.stroke();ctx.restore()};
  if(o.road){
-  if(ri){riDraw(['edge'],'#2b2b2b',.8);if(o.sw!=='none')riDraw(['thin'],'#555',.6)}
+  if(ri){riDraw(['edge'],'#2b2b2b',1.2);if(o.sw!=='none')riDraw(['thin'],'#555',.6)}
   for(const w of wp){poly(w.rings);ctx.fillStyle='#fff';ctx.fill('evenodd');if(!w.ns){ctx.strokeStyle='#444';ctx.lineWidth=.7;ctx.stroke()}}
   ctx.strokeStyle='#444';ctx.lineWidth=.7;for(const p of wll){pl(p);ctx.stroke()}
   // 国土地理院: 道路縁(車道・歩道の境界線)
