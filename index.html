@@ -351,7 +351,7 @@ if(it.k=='i'){if(it.front)hf+=imgSvg(it,on);else hb+=imgSvg(it,on);if(on)ht+=img
 if(it.k=='s'){h+=`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y})">${scafSvg(it)}${on?`<path d="M${it.pts.map(p=>p.x+' '+p.y).join('L')}Z" fill="none" stroke="#f59e0b" stroke-width="2.5" opacity=".7"/>`:''}</g>`;continue}
 if(it.k=='f'){hfe+=fenceSvg(it,on);if(on)ht+=fenceHdl(it);continue}if(it.t=='cone'){hc+=coneSvg(it,on);if(on)ht+=coneHdl(it);continue}if(it.tr&&it.tr.pts.length){htr+=trkSvg(it);if(on)ht+=trkHdl(it)}const w=it.l/m,hh=it.w/m;if(on&&it.t=='guard')ht+=szHdl(it,w,hh,0,0);let o='';
 if(it.o){const ow=it.o[0]/m,oh=it.o[1]/m;o=`<rect x="${-ow/2}" y="${-oh/2}" width="${ow}" height="${oh}" fill="none" stroke="${it.c}" stroke-dasharray="4 2" stroke-width="1"/>`}
-h+=`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a})">${SYM[it.t]?`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="transparent"/>`:''}${o}${SYM[it.t]?symSvg(it,w,hh,on):'<g transform="scale(-1 1)">'+shape(it,w,hh,on)+'</g>'}<text transform="rotate(${-it.a})" font-size="8" text-anchor="middle" y="${SYM[it.t]?-hh/2-3:2.2}" fill="#111" paint-order="stroke" stroke="#fff" stroke-width="1.6">${it.name}</text>${radSvg(it,on)}${on?rotH(it,hh):''}</g>`}
+h+=`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a})">${SYM[it.t]?`<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" fill="transparent"/>`:''}${o}${SYM[it.t]?symSvg(it,w,hh,on):'<g transform="scale(-1 1)">'+shape(it,w,hh,on)+'</g>'}${itLabel(it,hh,on)}${radSvg(it,on)}${on?rotH(it,hh):''}</g>`}
 h=hb+htr+h+hf+hfe+coneLines()+hc+conePrev(sel)+fencePrev(sel)+hw+hn+(window.wPrev?window.wPrev(sel):'');if(S.mode=='scaf'&&S.pts.length)h+=`<polyline points="${S.pts.map(p=>p.x+','+p.y).join(' ')}" fill="none" stroke="#f59e0b" stroke-width="1.5"/>`+S.pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="#f59e0b"/>`).join('')+(S.pts.length>=3?`<circle cx="${S.pts[0].x}" cy="${S.pts[0].y}" r="9" fill="none" stroke="#f59e0b" stroke-dasharray="2 2"/>`:'');
 if(S.mode=='cal')h+=S.cal.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="#e11d48"/>`).join('')+(S.cal.length==2?`<line x1="${S.cal[0].x}" y1="${S.cal[0].y}" x2="${S.cal[1].x}" y2="${S.cal[1].y}" stroke="#e11d48" stroke-width="1.5"/>`:'');
 h+=ht+measSvg();sv.innerHTML=h;sumup()}
@@ -363,10 +363,10 @@ if(S.mode=='fence'){if(e.pointerType=='mouse'&&e.button!=0)return;fencePt(e,p);i
 if(S.mode=='cone'){if(e.pointerType=='mouse'&&e.button==2)return;if(e.pointerType=='mouse'&&e.button!=0)return;conePt(e,p);if(e.pointerType!='mouse'){clearTimeout(S.lpT);S.lpOn=1;S.lp0={x:e.clientX,y:e.clientY};S.lpT=setTimeout(()=>{if(S.lpOn&&S.mode=='cone'){S.lpOn=0;if(navigator.vibrate)navigator.vibrate(20);coneEnd()}},650)}return}if(S.mode=='meas'){if(e.shiftKey)ortho(p,S.mp);if(!S.mp)S.mp=p;else{S.meas.push({a:S.mp,b:p});S.mp=null;S.hv=null}draw();return}
 if(S.mode=='cal'){if(S.cal.length>=2)S.cal=[];S.cal.push(p);if(S.cal.length==2)$('#calBox').style.display='';draw();return}
 if(window.wDown&&window.wDown(e,p))return;if(S.mode=='ann'){annDown(e,p);return}if(S.mode=='trk'&&!e.target.closest('[data-h]')){trkPt(p);return}
-if(S.mode=='piv'){const i0=S.items.find(i=>i.id==S.sel);if(i0)i0.pv=toLoc(i0,p);S.mode='sel';mode();props();return}const hd=e.target.closest('[data-h]'),g0=e.target.closest('[data-id]');if(hd&&g0){const i1=S.items.find(i=>i.id==g0.dataset.id);if(i1){if(S.sel!=i1.id){S.sel=i1.id;draw();props()}S.drag={it:i1,h:hd.dataset.h,s0:{x:i1.x,y:i1.y,w:i1.w,h:i1.h},s1:{l:i1.l,w:i1.w},g0:annSnap(i1),p0:p};sv.setPointerCapture(e.pointerId);return}}const g=e.target.closest('[data-id]');S.ss=null;if(g){const it=S.items.find(i=>i.id==g.dataset.id);S.sel=it.id;S.drag=it.k=='n'?{it,h:'an:mv',g0:annSnap(it),p0:p}:{it,dx:p.x-it.x,dy:p.y-it.y};sv.setPointerCapture(e.pointerId)}else{const sg=e.target.closest&&e.target.closest('[data-seg]');if(sg){coneSegDown(sg.dataset.seg,p,e);return}S.sel=null}draw();props()});
+if(S.mode=='piv'){const i0=S.items.find(i=>i.id==S.sel);if(i0)i0.pv=toLoc(i0,p);S.mode='sel';mode();props();return}const hd=e.target.closest('[data-h]'),g0=e.target.closest('[data-id]');if(hd&&g0){const i1=S.items.find(i=>i.id==g0.dataset.id);if(i1){if(S.sel!=i1.id){S.sel=i1.id;draw();props()}S.drag={it:i1,h:hd.dataset.h,s0:{x:i1.x,y:i1.y,w:i1.w,h:i1.h},s1:{l:i1.l,w:i1.w},g0:annSnap(i1),p0:p,lb0:{x:i1.ldx||0,y:i1.ldy||0,f:i1.lfs||8}};sv.setPointerCapture(e.pointerId);return}}const g=e.target.closest('[data-id]');S.ss=null;if(g){const it=S.items.find(i=>i.id==g.dataset.id);S.sel=it.id;S.drag=it.k=='n'?{it,h:'an:mv',g0:annSnap(it),p0:p}:{it,dx:p.x-it.x,dy:p.y-it.y};sv.setPointerCapture(e.pointerId)}else{const sg=e.target.closest&&e.target.closest('[data-seg]');if(sg){coneSegDown(sg.dataset.seg,p,e);return}S.sel=null}draw();props()});
 let _raf=0;const drawRaf=()=>{if(_raf)return;_raf=requestAnimationFrame(()=>{_raf=0;draw()})};
 sv.addEventListener('pointermove',e=>{window.wMove&&window.wMove(e);if(S.mode=='meas'&&S.mp){S.hv=ortho(pt(e),e.shiftKey?S.mp:null);draw()}if(S.mode=='fence'&&S.fp&&S.fp.pts.length){const a=S.fp.pts[S.fp.pts.length-1];S.fv=ortho(pt(e),e.shiftKey?a:null);drawRaf();fenceInfo()}if(S.mode=='cone'&&S.cl){const a=conePos(S.cl.ids[S.cl.ids.length-1]);S.cv=ortho(pt(e),e.shiftKey&&a?a:null);draw();coneInfo()}const d=S.drag;if(!d)return;if(e.pointerType=='mouse'&&e.buttons==0){S.drag=null;return}const p=pt(e);if(d.sg){coneSegMove(d,p);return}const it=d.it;if(it.k=='g'&&d.h&&/^gv/.test(d.h)){window.gDrag(it,d,p);drawRaf();return}if(it.k=='w'&&d.h&&/^w[vl]/.test(d.h)){window.wDrag(it,d,p);drawRaf();return}if(it.k=='f'&&d.h&&/^f[vl]\d/.test(d.h)){fenceDrag(it,d,p);drawRaf();return}
-if(d.h=='rot'){let a=Math.atan2(p.y-it.y,p.x-it.x)*180/Math.PI+90;a=((a%360)+360)%360;if(e.shiftKey)a=Math.round(a/15)*15%360;else{const q=Math.round(a/90)*90;if(Math.abs(a-q)<3)a=q%360}it.a=Math.round(a*10)/10;const ai=document.querySelector('#props input[data-k=a]');if(ai)ai.value=it.a}else if(d.h&&d.h.startsWith('an:'))annDrag(it,d,p,e);else if(d.h=='new')annNew(d,p,e);else if(d.h=='p')it.pv=toLoc(it,p);
+if(d.h=='rot'){let a=Math.atan2(p.y-it.y,p.x-it.x)*180/Math.PI+90;a=((a%360)+360)%360;if(e.shiftKey)a=Math.round(a/15)*15%360;else{const q=Math.round(a/90)*90;if(Math.abs(a-q)<3)a=q%360}it.a=Math.round(a*10)/10;const ai=document.querySelector('#props input[data-k=a]');if(ai)ai.value=it.a}else if(d.h=='lb'){it.ldx=Math.round((d.lb0.x+p.x-d.p0.x)*10)/10;it.ldy=Math.round((d.lb0.y+p.y-d.p0.y)*10)/10}else if(d.h=='lbs'){const f0=d.lb0.f,w0=lbW(it,f0),k=Math.max(.2,(w0+2*(p.x-d.p0.x))/w0);it.lfs=Math.round(Math.min(80,Math.max(3,f0*k))*10)/10;const fi=document.querySelector('#props input[data-k=lfs]');if(fi)fi.value=it.lfs}else if(d.h&&d.h.startsWith('an:'))annDrag(it,d,p,e);else if(d.h=='new')annNew(d,p,e);else if(d.h=='p')it.pv=toLoc(it,p);
 else if(d.h&&d.h.startsWith('tp')){it.tr.pts[+d.h.slice(2)]=toLoc(it,p).map(v=>Math.round(v*10)/10)}
 else if(d.h&&d.h.startsWith('cz'))objResize(it,d,p,e.shiftKey);
 else if(d.h&&d.h.startsWith('sz'))imgResize(it,d,p,e.shiftKey);
@@ -389,6 +389,13 @@ const CB=24.5;
 function conePos(id){const c=S.items.find(i=>i.id==id);return c?{x:c.x,y:c.y}:null}
 // a→b を等分(間隔は設定値以内。+10%まで許容)した点列。aは含まず、bを含む
 function segPts(a,b){const d=Math.hypot(b.x-a.x,b.y-a.y),sp=Math.max(300,+$('#csp').value||2000),n=Math.max(1,Math.ceil(d*S.mpp*1000/sp-.1)),r=[];for(let i=1;i<=n;i++)r.push({x:a.x+(b.x-a.x)*i/n,y:a.y+(b.y-a.y)*i/n});return r}
+
+// ---- 図形の名称(「ガードマン」など): ドラッグで移動、右端の●ドラッグまたは入力欄でサイズ変更(位置・サイズは図形ごとに保存)
+function lbW(it,f){let w=0;for(const ch of String(it.name||'')){w+=ch.charCodeAt(0)>255?f:f*.58}return Math.max(f,w)}
+function itLabel(it,hh,on){const f=it.lfs||8,y=(SYM[it.t]?-hh/2-3:2.2),w=lbW(it,f),hw=w/2,dx=it.ldx||0,dy=it.ldy||0;
+ const hit=`<rect x="${-hw-2}" y="${y-f}" width="${w+4}" height="${f*1.3}" fill="transparent"/>`;
+ const hdl=on?`<line x1="${-hw-2}" y1="${y+f*.3}" x2="${hw+2}" y2="${y+f*.3}" stroke="#f59e0b" stroke-width=".8" stroke-dasharray="2 2" pointer-events="none"/><g data-h="lbs" style="cursor:ew-resize"><circle cx="${hw+5}" cy="${y-f*.35}" r="10" fill="transparent"/><circle cx="${hw+5}" cy="${y-f*.35}" r="4" fill="#fff" stroke="#f59e0b" stroke-width="1.2"/></g>`:'';
+ return `<g transform="rotate(${-it.a}) translate(${dx} ${dy})"><g data-h="lb" style="cursor:move">${hit}<text font-size="${f}" text-anchor="middle" y="${y}" fill="#111" paint-order="stroke" stroke="#fff" stroke-width="${Math.max(1.6,f*.2)}">${it.name}</text></g>${hdl}</g>`}
 // ---- ガードマン/カラーコーン: 四隅のハンドルでサイズ変更(縮尺と無関係に自由)
 function szHdl(it,w,hh,cx,cy){let s='';for(const[hx,hy,cu]of [[-1,-1,'nwse-resize'],[1,-1,'nesw-resize'],[1,1,'nwse-resize'],[-1,1,'nesw-resize']]){const X=cx+hx*w/2,Y=cy+hy*hh/2;s+=`<rect data-h="cz${hx},${hy}" x="${X-12}" y="${Y-12}" width="24" height="24" fill="transparent" style="cursor:${cu}"/><rect data-h="cz${hx},${hy}" x="${X-5}" y="${Y-5}" width="10" height="10" fill="#fff" stroke="#f59e0b" stroke-width="1.6" style="cursor:${cu}"/>`}
 return `<g data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a||0})">${s}</g>`}
@@ -578,9 +585,9 @@ Object.keys(FT).forEach(ft=>{const pe=$('#fp_'+ft),ce=$('#fc_'+ft);
 // ---- プロパティ・集計
 function props(){const it=S.items.find(i=>i.id==S.sel),P=$('#props');$('#pbox').style.display=it&&it.k!='n'?'block':'none';annUI();window.wUI&&window.wUI();if(!it&&S.ss&&S.lines.some(l=>l.id==S.ss.l)){$('#pbox').style.display='block';P.innerHTML='<b>カラーコーン列</b><div class="row"><button id="bline">この列を全削除</button></div>';$('#bline').onclick=coneDelLine;return}if(!it||it.k=='n')return;if(it.k=='g'){window.gProps(it,P);return}if(it.k=='w'){window.wProps(it,P);return}if(it.k=='i'){propsImg(it,P);return}if(it.k=='f'){propsFence(it,P);return}
 const inp=(k,l,st='any')=>`${l}<input type="number" step="${st}" data-k="${k}" value="${it[k]}">`;
-P.innerHTML=`<b>${it.name}</b><div class="row">`+(it.k=='s'?inp('gap','離隔','0.05')+inp('wid','幅','0.05')+inp('lift','段高','0.1')+inp('h','高さ','0.5'):inp('l','長さm','0.1')+inp('w','幅m','0.1')+(it.t=='cone'?'':inp('a','角度°','5')))+`</div>`+(PIV.has(it.t)&&it.pv?`<div class="row">作業半径<input id="rad" type="number" step="0.5" min="0" data-k="rad" value="${it.rad}" max="${RMAX[it.t]||''}" placeholder="${DR[it.t]}">m<button id="bpv" ${it.pvEdit?'':'hidden'}>旋回軸を指定</button></div><div class="row"><label><input type="checkbox" id="pvedit" style="width:auto" ${it.pvEdit?'checked':''}> 旋回軸の位置を調整する(通常は車両に固定)</label></div><div class="small">半径を入力(${RMAX[it.t]?'最大'+RMAX[it.t]+'m':'目安'+DR[it.t]+'m'})→円を表示。円は車両に固定され、車両の移動・回転に追従します。円の線(縁)をドラッグすると半径が伸び縮みします(ポンプ車は灰色の点線=最大半径まで)。旋回軸の位置を直すときだけ下のチェックを入れてください。赤丸のドラッグで半径変更(0で非表示)。</div>`:'')+`<div class="row"><button id="b90"${it.t=='cone'?' hidden':''}>90°回転</button><button id="bdup">複製</button><button id="bdel">削除</button>${it.t=='cone'?'<button id="bline">この列を全削除</button>':''}</div>`;
+P.innerHTML=`<b>${it.name}</b><div class="row">`+(it.k=='s'?inp('gap','離隔','0.05')+inp('wid','幅','0.05')+inp('lift','段高','0.1')+inp('h','高さ','0.5'):inp('l','長さm','0.1')+inp('w','幅m','0.1')+(it.t=='cone'?'':inp('a','角度°','5')))+`</div>`+(it.t=='cone'?'':`<div class="row">名称の文字<input type="number" step="1" min="3" max="80" data-k="lfs" value="${it.lfs||8}"><button id="blr">名称を元の位置・大きさに</button></div>`)+(PIV.has(it.t)&&it.pv?`<div class="row">作業半径<input id="rad" type="number" step="0.5" min="0" data-k="rad" value="${it.rad}" max="${RMAX[it.t]||''}" placeholder="${DR[it.t]}">m<button id="bpv" ${it.pvEdit?'':'hidden'}>旋回軸を指定</button></div><div class="row"><label><input type="checkbox" id="pvedit" style="width:auto" ${it.pvEdit?'checked':''}> 旋回軸の位置を調整する(通常は車両に固定)</label></div><div class="small">半径を入力(${RMAX[it.t]?'最大'+RMAX[it.t]+'m':'目安'+DR[it.t]+'m'})→円を表示。円は車両に固定され、車両の移動・回転に追従します。円の線(縁)をドラッグすると半径が伸び縮みします(ポンプ車は灰色の点線=最大半径まで)。旋回軸の位置を直すときだけ下のチェックを入れてください。赤丸のドラッグで半径変更(0で非表示)。</div>`:'')+`<div class="row"><button id="b90"${it.t=='cone'?' hidden':''}>90°回転</button><button id="bdup">複製</button><button id="bdel">削除</button>${it.t=='cone'?'<button id="bline">この列を全削除</button>':''}</div>`;
 P.querySelectorAll('input').forEach(i=>i.onchange=()=>{let v=+i.value;if(it.pv&&(i.dataset.k=='l'||i.dataset.k=='w')&&it[i.dataset.k]>0&&v>0){it.pv[i.dataset.k=='l'?0:1]*=v/it[i.dataset.k]}if(i.dataset.k=='rad'&&RMAX[it.t]&&v>RMAX[it.t]){v=RMAX[it.t];i.value=v}it[i.dataset.k]=v;draw()});
-trkProps(it,P);$('#b90').onclick=()=>{if(it.k=='o'&&it.t!='cone'){it.a=(it.a+90)%360;draw();props()}};$('#bdel').onclick=del;if($('#bline'))$('#bline').onclick=coneDelLine;if($('#bpv'))$('#bpv').onclick=()=>{S.mode='piv';mode()};if($('#pvedit'))$('#pvedit').onchange=e=>{it.pvEdit=e.target.checked;draw();props()};
+trkProps(it,P);if($('#blr'))$('#blr').onclick=()=>{delete it.ldx;delete it.ldy;delete it.lfs;draw();props()};$('#b90').onclick=()=>{if(it.k=='o'&&it.t!='cone'){it.a=(it.a+90)%360;draw();props()}};$('#bdel').onclick=del;if($('#bline'))$('#bline').onclick=coneDelLine;if($('#bpv'))$('#bpv').onclick=()=>{S.mode='piv';mode()};if($('#pvedit'))$('#pvedit').onchange=e=>{it.pvEdit=e.target.checked;draw();props()};
 $('#bdup').onclick=()=>{const c=JSON.parse(JSON.stringify(it));c.id=S.uid++;c.x+=15;c.y+=15;S.items.push(c);S.sel=c.id;draw();props()}}
 function del(){S.items=S.items.filter(i=>i.id!=S.sel);S.sel=null;draw();props()}
 function sumup(){const c={};let h='';S.items.forEach(i=>{if(i.k=='o')c[i.name]=(c[i.name]||0)+1});
@@ -1254,7 +1261,7 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
    <label><input type="checkbox" id="rdoScale" checked>縮尺を表示</label>
    <label><input type="checkbox" id="rdoRoad" checked>道路線</label>
    <label title="歩道の帯を描きます。OSM情報=地図データに歩道の記載がある道路のみ。推定を含める=幹線道路(国道・県道・主要市道)は両側に歩道があるものとして描きます。【標準地図→線画変換のとき】「なし」以外は、標準地図にある歩道側の細い線をそのまま描きます">歩道<select id="rdoSw"><option value="gsi" selected>地理院+道路縁から推定</option><option value="est">OSM+推定</option><option value="osm">OSM情報のみ</option><option value="none">なし</option></select></label>
-   <label title="道路縁から道路中心側へ平行移動する距離(歩道幅)。道路の片側幅員(縁〜中心線)がこの値未満の細い道には歩道線を描きません">歩道幅<input type="number" id="rdoSwW" value="2.5" min="1" max="6" step="0.5" style="width:50px">m 対象<input type="number" id="rdoSwM" value="4" min="2" max="15" step="0.5" style="width:50px">m以上</label><label><input type="checkbox" id="rdoZb" checked>横断歩道</label>
+   <label title="道路縁から道路中心側へ平行移動する距離(歩道幅)。道路の片側幅員(縁〜中心線)がこの値未満の細い道には歩道線を描きません">歩道幅<input type="number" id="rdoSwW" value="2.5" min="1" max="6" step="0.5" style="width:50px">m 対象<input type="number" id="rdoSwM" value="4" min="2" max="15" step="0.5" style="width:50px">m以上</label><label><input type="checkbox" id="rdoZb" checked>横断歩道</label><label title="横断歩道の縞を、道路の線(道路縁)からこの距離だけ内側で止めます。歩道側にはみ出す場合は大きく、短すぎる場合は小さくします(0で線まで)">歩道側の余白<input type="number" id="rdoZbM" value="1.5" min="0" max="8" step="0.5" style="width:50px">m</label>
    <label title="道路幅が実際と違うときに、車道の幅をまとめて増減します">車道幅<input type="number" id="rdoRs" value="100" min="50" max="200" step="5" style="width:56px">%</label>
    <label><input type="checkbox" id="rdoBld" checked>建物線</label>
    <label><input type="checkbox" id="rdoAttr" checked>出典表示</label>
@@ -1729,12 +1736,12 @@ async function fetchImg(g){
   // 建物の塗り(輪郭の内側)。解像度を落として保持
   const fw=Math.min(W,cw*6),fh=Math.min(H,ch*6),fc=document.createElement('canvas');fc.width=fw;fc.height=fh;const f1=fc.getContext('2d');
   // 塗りは直線化した建物輪郭(閉じたもの)から作る → 線と塗りが一致する
-  let npoly=0;f1.fillStyle='rgb(241,241,241)';
+  let npoly=0;f1.fillStyle='rgb(219,236,250)';
   for(const l of r.lines){if(l.k!=='bld'||l.pts.length<4)continue;const a=l.pts[0],b=l.pts[l.pts.length-1];if(Math.hypot(a[0]-b[0],a[1]-b[1])>6*F)continue;
     f1.beginPath();l.pts.forEach((pt,i)=>{const x=pt[0]/F*fw/cw,y=pt[1]/F*fh/ch;i?f1.lineTo(x,y):f1.moveTo(x,y)});f1.closePath();f1.fill();npoly++}
   if(!npoly){const c0=document.createElement('canvas');c0.width=W;c0.height=H;
    const f0=c0.getContext('2d'),fi=f0.createImageData(W,H),fd=fi.data,FLm=r.fill;
-   for(let i=0,j=0;i<FLm.length;i++,j+=4)if(FLm[i]){fd[j]=fd[j+1]=fd[j+2]=241;fd[j+3]=255}
+   for(let i=0,j=0;i<FLm.length;i++,j+=4)if(FLm[i]){fd[j]=219;fd[j+1]=236;fd[j+2]=250;fd[j+3]=255}
    f0.putImageData(fi,0,0);f1.drawImage(c0,0,0,W,H,0,0,fw,fh);c0.width=c0.height=1}
   c2.width=c2.height=1;
   g.imgz=z;g.nl=lines.length;
@@ -1876,20 +1883,42 @@ function render(ctx,Wpx,els,g,o){
   if(o.zb){ctx.strokeStyle='#333';ctx.fillStyle='#fff';ctx.lineWidth=.45;
    const th=Math.max(1.2,.45*ppm),sp=Math.max(2.6,.9*ppm),hl=Math.max(3,3*ppm/2+.5*ppm);
    // 縞が歩道エリア(道路縁・歩道線)へはみ出さないよう、各縞を最寄りの縁線で切り詰める
-   const eseg=[];const addL=(pts)=>{for(let i=0;i<pts.length-1;i++)eseg.push([pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1]])};
+   const eseg=[];const ZM=(o.zbm!=null?o.zbm:1.5)*ppm;const addL=(pts,m)=>{if(m==null)m=ZM;for(let i=0;i<pts.length-1;i++)eseg.push([pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1],m])};
    if(ri){const{s:rs,ax:rx,ay:ry}=riT();for(const L of ri.lines){if(L.k!=='edge'&&L.k!=='thin')continue;addL(L.pts.map(pp=>[rx+pp[0]*rs,ry+pp[1]*rs]))}}
    for(const pp of ge)addL(pp);for(const pp of ge2)addL(pp);
-   for(const b of sd){const hw=(b.w||2)*ppm/2;if(hw<=0)continue;const l1=offs(b.pts,hw),l2=offs(b.pts,-hw);if(l1&&l1.length===b.pts.length)addL(l1);if(l2&&l2.length===b.pts.length)addL(l2)}
-   const hit=(cx,cy,dx,dy,mx)=>{let best=mx;for(const e of eseg){
-     const x1=e[0],y1=e[1],ex=e[2]-x1,ey=e[3]-y1;
-     if(Math.min(x1,e[2])>cx+Math.abs(dx)*mx+.5||Math.max(x1,e[2])<cx-Math.abs(dx)*mx-.5||Math.min(y1,e[3])>cy+Math.abs(dy)*mx+.5||Math.max(y1,e[3])<cy-Math.abs(dy)*mx-.5)continue;
-     const den=dx*ey-dy*ex;if(Math.abs(den)<1e-9)continue;
-     const t=((x1-cx)*ey-(y1-cy)*ex)/den,u=((x1-cx)*dy-(y1-cy)*dx)/den;
-     if(t>.4&&t<best&&u>=0&&u<=1)best=t}return best};
-   for(const z of zb){let rest=sp/2;
+   for(const b of sd){const hw=(b.w||2)*ppm/2;if(hw<=0)continue;const l1=offs(b.pts,hw),l2=offs(b.pts,-hw);if(l1&&l1.length===b.pts.length)addL(l1,.9);if(l2&&l2.length===b.pts.length)addL(l2,.9)}
+   // 縞(厚み th の帯)が縁線にふさがれる区間を、縞の長さ方向(-hl〜hl)で返す。帯全体で判定するので斜めの縁線にも対応
+   // 線分を格子に振り分けて、縞の近くの線分だけを調べる(描画時間の短縮)
+   const GC=Math.max(24,hl*3),grid=new Map(),stamp=new Int32Array(eseg.length);let stc=0;
+   eseg.forEach((e,i)=>{const x0=Math.floor(Math.min(e[0],e[2])/GC),x1=Math.floor(Math.max(e[0],e[2])/GC),y0=Math.floor(Math.min(e[1],e[3])/GC),y1=Math.floor(Math.max(e[1],e[3])/GC);
+    if((x1-x0+1)*(y1-y0+1)>400)return;
+    for(let gx=x0;gx<=x1;gx++)for(let gy=y0;gy<=y1;gy++){const k=gx+','+gy;let l=grid.get(k);if(!l){l=[];grid.set(k,l)}l.push(i)}});
+   const near=(cx,cy,r)=>{const res=[];stc++;const x0=Math.floor((cx-r)/GC),x1=Math.floor((cx+r)/GC),y0=Math.floor((cy-r)/GC),y1=Math.floor((cy+r)/GC);
+    for(let gx=x0;gx<=x1;gx++)for(let gy=y0;gy<=y1;gy++){const l=grid.get(gx+','+gy);if(!l)continue;for(const i of l){if(stamp[i]!==stc){stamp[i]=stc;res.push(eseg[i])}}}return res};
+   const blocks=(cx,cy,dx,dy,ux,uy,mx)=>{const out=[];
+    for(const e of near(cx,cy,mx+th/2+ZM+3)){const mg=Math.max(.9,e[4]),hw=th/2+mg;
+     if(Math.min(e[0],e[2])>cx+mx+hw+1||Math.max(e[0],e[2])<cx-mx-hw-1||Math.min(e[1],e[3])>cy+mx+hw+1||Math.max(e[1],e[3])<cy-mx-hw-1)continue;
+     const a1=(e[0]-cx)*ux+(e[1]-cy)*uy,b1=(e[0]-cx)*dx+(e[1]-cy)*dy,a2=(e[2]-cx)*ux+(e[3]-cy)*uy,b2=(e[2]-cx)*dx+(e[3]-cy)*dy;
+     if(Math.max(a1,a2)<-hw||Math.min(a1,a2)>hw)continue;
+     let t0=0,t1=1;const da=a2-a1;
+     if(Math.abs(da)<1e-9){if(Math.abs(a1)>hw)continue}
+     else{let ta=(-hw-a1)/da,tb=(hw-a1)/da;if(ta>tb){const q=ta;ta=tb;tb=q}t0=Math.max(t0,ta);t1=Math.min(t1,tb);if(t0>t1)continue}
+     const bb1=b1+(b2-b1)*t0,bb2=b1+(b2-b1)*t1,lo=Math.min(bb1,bb2)-mg,hi=Math.max(bb1,bb2)+mg;
+     if(hi<-mx||lo>mx)continue;out.push([lo,hi])}
+    out.sort((p,q)=>p[0]-q[0]);const m=[];for(const v of out){if(m.length&&v[0]<=m[m.length-1][1])m[m.length-1][1]=Math.max(m[m.length-1][1],v[1]);else m.push(v.slice())}
+    return m};
+   // 空き区間のうち、中心を含むもの/なければ直前の縞に最も重なるもの(道路側)を選ぶ
+   const pick=(bl,mx,prev)=>{const fr=[];let cur=-mx;for(const v of bl){if(v[0]>cur)fr.push([cur,Math.min(v[0],mx)]);cur=Math.max(cur,v[1])}if(cur<mx)fr.push([cur,mx]);
+    if(!fr.length)return null;
+    for(const f of fr)if(f[0]<=0&&f[1]>=0)return f;
+    let best=null,bs=-1e9;
+    for(const f of fr){const sc=prev?Math.min(f[1],prev[1])-Math.max(f[0],prev[0]):(f[1]-f[0]);if(sc>bs){bs=sc;best=f}}
+    return best};
+   for(const z of zb){let rest=sp/2,prev=null;
     for(let i=0;i<z.pts.length-1;i++){const a=z.pts[i],b=z.pts[i+1],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);if(len<1e-6)continue;const ux=dx/len,uy=dy/len;
      let d=rest;for(;d<=len;d+=sp){const cx=a[0]+ux*d,cy=a[1]+uy*d,px=-uy,py=ux;
-      let hp=hit(cx,cy,px,py,hl),hm=hit(cx,cy,-px,-py,hl);if(hp+hm<3){hp=hl;hm=hl}else{hp=Math.max(.8,hp-.3);hm=Math.max(.8,hm-.3)}
+      const f=pick(blocks(cx,cy,px,py,ux,uy,hl),hl,prev);if(!f||f[1]-f[0]<Math.max(2,hl*.7)){continue}
+      prev=f;const hp=f[1],hm=-f[0];
       ctx.beginPath();ctx.moveTo(cx-ux*th/2-px*hm,cy-uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2-px*hm,cy+uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2+px*hp,cy+uy*th/2+py*hp);ctx.lineTo(cx-ux*th/2+px*hp,cy-uy*th/2+py*hp);ctx.closePath();ctx.fill();ctx.stroke()}
      rest=d-len}}}
   ctx.strokeStyle='#555';ctx.lineWidth=.6;for(const c of thin){pl(c.pts);ctx.stroke()}
@@ -1898,7 +1927,7 @@ function render(ctx,Wpx,els,g,o){
   ctx.strokeStyle='#fff';ctx.lineWidth=.9;ctx.setLineDash([5,5]);for(const p of rw){pl(p);ctx.stroke()}ctx.setLineDash([])}
  if(o.bld||o.fill){ctx.miterLimit=2;
   if(ri&&o.fill&&ri.fill){const{s,ax,ay}=riT();ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(ri.fill,ax+ri.x0*s,ay+ri.y0*s,ri.cw*s,ri.ch*s);ctx.restore()}
-  for(const b of bl){poly(b.rings);ctx.fillStyle=o.fill?'#f1f1f1':'#fff';ctx.fill('evenodd');if(o.bld&&!b.ns){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;ctx.stroke()}}
+  for(const b of bl){poly(b.rings);ctx.fillStyle=o.fill?'#dbecfa':'#fff';ctx.fill('evenodd');if(o.bld&&!b.ns){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;ctx.stroke()}}
   if(o.bld){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;for(const p of bll){pl(p);ctx.stroke()}}
   if(ri&&o.bld)riDraw(['bld'],'#2b2b2b',.7)}
  if(o.name){
@@ -1923,7 +1952,7 @@ function render(ctx,Wpx,els,g,o){
   ctx.font='bold 9px Arial,"Yu Gothic",sans-serif';ctx.textAlign='center';for(let i=0;i<=4;i++)if(u*ppm>=30||i%2==0)ctx.fillText(i?i*u+'m':'0',x0+i*u*ppm,y+12);ctx.restore()}
  if(o.attr){ctx.save();ctx.font='7px "Yu Gothic","Hiragino Sans",Meiryo,sans-serif';ctx.fillStyle='#555';ctx.textAlign='right';ctx.fillText(g.src==='img'?'出典:国土地理院(標準地図)を線画に自動変換'+(g.nm?' / 施設名:© OpenStreetMap contributors':''):g.src==='gsi'?'出典:国土地理院(基盤地図情報・最適化ベクトルタイル)'+(g.nm?' / 施設名・歩道:© OpenStreetMap contributors':''):'地図データ © OpenStreetMap contributors',A3W-10,A3H-8);ctx.restore()}
  ctx.setTransform(1,0,0,1,0,0)}
-const opts=()=>({name:q('#rdoName').checked,north:q('#rdoNorth').checked,fill:q('#rdoFill').checked,scale:q('#rdoScale').checked,road:q('#rdoRoad').checked,bld:q('#rdoBld').checked,attr:q('#rdoAttr').checked,sw:q('#rdoSw').value,swd:+q('#rdoSwW').value||2.5,swm:+q('#rdoSwM').value||4,zb:q('#rdoZb').checked,rs:Math.min(2,Math.max(.5,(+q('#rdoRs').value||100)/100))});
+const opts=()=>({name:q('#rdoName').checked,north:q('#rdoNorth').checked,fill:q('#rdoFill').checked,scale:q('#rdoScale').checked,road:q('#rdoRoad').checked,bld:q('#rdoBld').checked,attr:q('#rdoAttr').checked,sw:q('#rdoSw').value,swd:+q('#rdoSwW').value||2.5,swm:+q('#rdoSwM').value||4,zb:q('#rdoZb').checked,zbm:Math.max(0,+q('#rdoZbM').value||0),rs:Math.min(2,Math.max(.5,(+q('#rdoRs').value||100)/100))});
 function renderPreview(){if(!osm||!geo)return;const c=q('#rdcv'),W=PZ>1.6?4800:1800;c.width=W;c.height=Math.round(W*A3H/A3W);render(c.getContext('2d'),W,osm,geo,opts());pvFit();
  st((geo.src==='img'?'[地理院 標準地図→線画] ':geo.src==='gsi'?'[国土地理院] ':'[OpenStreetMap] ')+'縮尺 1/'+geo.N+'(A3横 / 用紙の幅=実寸約'+Math.round(geo.N*PW)+'m)。表示を確認して「作図画面に反映」を押してください。'+(geo.src==='gsi'?'  [歩道(OSM): '+(geo.swn||0)+'本 / 施設名(地理院注記): '+(geo.nAnno||0)+'件]':'')+(geo.src==='gsi'&&geo.lay?'  [取得データ: '+geo.lay+']':'')+(geo.src==='img'?'  [線: '+(geo.nl||0)+'本 / 画像ズーム'+(geo.imgz||'')+']':''),'ok')}
 // ---- 作図画面へ反映
@@ -2247,7 +2276,7 @@ q('#rdgo').onclick=async()=>{const t=q('#rdq').value.trim();if(!t||!map)return;
   const c=j[0].geometry.coordinates;map.setView([c[1],c[0]],18);st('「'+((j[0].properties&&j[0].properties.title)||t)+'」付近を表示しました。')}
  catch(e){st('住所検索に失敗しました。ネットワーク接続を確認してください。','err')}};
 q('#rdq').onkeydown=e=>{if(e.key==='Enter')q('#rdgo').click()};
-['rdoName','rdoNorth','rdoFill','rdoScale','rdoRoad','rdoBld','rdoAttr','rdoSw','rdoSwW','rdoSwM','rdoZb','rdoRs'].forEach(i=>q('#'+i).onchange=renderPreview);
+['rdoName','rdoNorth','rdoFill','rdoScale','rdoRoad','rdoBld','rdoAttr','rdoSw','rdoSwW','rdoSwM','rdoZb','rdoZbM','rdoRs'].forEach(i=>q('#'+i).onchange=renderPreview);
 q('#rdback').onclick=()=>{view(1);initMap();startSel()};
 q('#rdok').onclick=applyToCanvas;
 q('#blank').addEventListener('click',()=>{S.mapBg=null});
