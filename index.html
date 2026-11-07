@@ -1254,7 +1254,7 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
    <label><input type="checkbox" id="rdoScale" checked>縮尺を表示</label>
    <label><input type="checkbox" id="rdoRoad" checked>道路線</label>
    <label title="歩道の帯を描きます。OSM情報=地図データに歩道の記載がある道路のみ。推定を含める=幹線道路(国道・県道・主要市道)は両側に歩道があるものとして描きます。【標準地図→線画変換のとき】「なし」以外は、標準地図にある歩道側の細い線をそのまま描きます">歩道<select id="rdoSw"><option value="gsi" selected>地理院+道路縁から推定</option><option value="est">OSM+推定</option><option value="osm">OSM情報のみ</option><option value="none">なし</option></select></label>
-   <label title="道路縁から道路中心側へ平行移動する距離(歩道幅)。道路の片側幅員(縁〜中心線)がこの値未満の細い道には歩道線を描きません">歩道幅<input type="number" id="rdoSwW" value="2.5" min="1" max="6" step="0.5" style="width:50px">m 対象<input type="number" id="rdoSwM" value="4" min="2" max="15" step="0.5" style="width:50px">m以上</label><label><input type="checkbox" id="rdoZb" checked>横断歩道</label><label title="横断歩道の縞を、道路の線(道路縁)からこの距離だけ内側で止めます。歩道側にはみ出す場合は大きく、短すぎる場合は小さくします(0で線まで)">歩道側の余白<input type="number" id="rdoZbM" value="2.5" min="0" max="8" step="0.5" style="width:50px">m</label>
+   <label title="道路縁から道路中心側へ平行移動する距離(歩道幅)。道路の片側幅員(縁〜中心線)がこの値未満の細い道には歩道線を描きません">歩道幅<input type="number" id="rdoSwW" value="2.5" min="1" max="6" step="0.5" style="width:50px">m 対象<input type="number" id="rdoSwM" value="4" min="2" max="15" step="0.5" style="width:50px">m以上</label><label><input type="checkbox" id="rdoZb" checked>横断歩道</label><label title="横断歩道の縞を、道路の線(道路縁)からこの距離だけ内側で止めます。歩道側にはみ出す場合は大きく、短すぎる場合は小さくします(0で線まで)">歩道側の余白<input type="number" id="rdoZbM" value="1.5" min="0" max="8" step="0.5" style="width:50px">m</label>
    <label title="道路幅が実際と違うときに、車道の幅をまとめて増減します">車道幅<input type="number" id="rdoRs" value="100" min="50" max="200" step="5" style="width:56px">%</label>
    <label><input type="checkbox" id="rdoBld" checked>建物線</label>
    <label><input type="checkbox" id="rdoAttr" checked>出典表示</label>
@@ -1876,7 +1876,7 @@ function render(ctx,Wpx,els,g,o){
   if(o.zb){ctx.strokeStyle='#333';ctx.fillStyle='#fff';ctx.lineWidth=.45;
    const th=Math.max(1.2,.45*ppm),sp=Math.max(2.6,.9*ppm),hl=Math.max(3,3*ppm/2+.5*ppm);
    // 縞が歩道エリア(道路縁・歩道線)へはみ出さないよう、各縞を最寄りの縁線で切り詰める
-   const eseg=[];const ZM=(o.zbm!=null?o.zbm:2.5)*ppm;const addL=(pts,m)=>{if(m==null)m=ZM;for(let i=0;i<pts.length-1;i++)eseg.push([pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1],m])};
+   const eseg=[];const ZM=(o.zbm!=null?o.zbm:1.5)*ppm;const addL=(pts,m)=>{if(m==null)m=ZM;for(let i=0;i<pts.length-1;i++)eseg.push([pts[i][0],pts[i][1],pts[i+1][0],pts[i+1][1],m])};
    if(ri){const{s:rs,ax:rx,ay:ry}=riT();for(const L of ri.lines){if(L.k!=='edge'&&L.k!=='thin')continue;addL(L.pts.map(pp=>[rx+pp[0]*rs,ry+pp[1]*rs]))}}
    for(const pp of ge)addL(pp);for(const pp of ge2)addL(pp);
    for(const b of sd){const hw=(b.w||2)*ppm/2;if(hw<=0)continue;const l1=offs(b.pts,hw),l2=offs(b.pts,-hw);if(l1&&l1.length===b.pts.length)addL(l1,.9);if(l2&&l2.length===b.pts.length)addL(l2,.9)}
@@ -1910,7 +1910,7 @@ function render(ctx,Wpx,els,g,o){
    for(const z of zb){let rest=sp/2,prev=null;
     for(let i=0;i<z.pts.length-1;i++){const a=z.pts[i],b=z.pts[i+1],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);if(len<1e-6)continue;const ux=dx/len,uy=dy/len;
      let d=rest;for(;d<=len;d+=sp){const cx=a[0]+ux*d,cy=a[1]+uy*d,px=-uy,py=ux;
-      const f=pick(blocks(cx,cy,px,py,ux,uy,hl),hl,prev);if(!f||f[1]-f[0]<2){continue}
+      const f=pick(blocks(cx,cy,px,py,ux,uy,hl),hl,prev);if(!f||f[1]-f[0]<Math.max(2,hl*.7)){continue}
       prev=f;const hp=f[1],hm=-f[0];
       ctx.beginPath();ctx.moveTo(cx-ux*th/2-px*hm,cy-uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2-px*hm,cy+uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2+px*hp,cy+uy*th/2+py*hp);ctx.lineTo(cx-ux*th/2+px*hp,cy-uy*th/2+py*hp);ctx.closePath();ctx.fill();ctx.stroke()}
      rest=d-len}}}
