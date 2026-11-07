@@ -1198,8 +1198,10 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
 #rdlay{display:none;position:absolute;inset:0;z-index:5;cursor:crosshair;touch-action:none;background:rgba(0,0,0,.08)}
 #rdrect{display:none;position:absolute;border:2px solid #e11d1d;background:rgba(225,29,29,.10);pointer-events:none;box-sizing:border-box}
 #rdrect span{position:absolute;left:-2px;top:-24px;background:#e11d1d;color:#fff;font-size:12px;padding:1px 7px;border-radius:4px 4px 0 0;white-space:nowrap}
-#rdpv{position:absolute;inset:0;overflow:auto;display:flex;align-items:center;justify-content:center;padding:12px}
-#rdcv{max-width:100%;max-height:100%;background:#fff;box-shadow:0 2px 10px #0006}
+#rdpv{position:absolute;inset:0;overflow:auto;display:flex;padding:12px}
+#rdcv{flex:none;margin:auto;background:#fff;box-shadow:0 2px 10px #0006}
+#rdcv.fitr{max-width:100%;max-height:100%}
+#rdzm{position:absolute;right:16px;bottom:14px;z-index:5;display:flex;gap:4px;align-items:center;background:#fffd;border-radius:8px;padding:4px 6px;box-shadow:0 1px 6px #0005}#rdzm button{min-width:34px;height:32px;font-size:16px;font-weight:700}#rdzm span{min-width:46px;text-align:center;font-size:13px}
 #rdtop button.tab.on{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:700}
 #rdform{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:6px 10px;background:var(--pn);border-bottom:1px solid var(--bd)}
 #rdform label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}#rdform input[type=checkbox]{width:auto;padding:0}
@@ -1272,6 +1274,7 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
   <div id="rdguide"><span>詳細図の範囲</span></div>
   <div id="rdlay"><div id="rdrect"><span></span></div></div>
   <div id="rdpv" hidden><canvas id="rdcv"></canvas></div>
+  <div id="rdzm"><button id="rdzo" type="button" title="縮小">－</button><span id="rdzv">100%</span><button id="rdzi" type="button" title="拡大">＋</button><button id="rdzf" type="button" title="全体表示">全体</button></div>
  </div>
 </div>
 <script>
@@ -1321,7 +1324,7 @@ function guideBox(){const b=q('#rdbody'),W=b.clientWidth,H=b.clientHeight;let w=
 function ui(){const R_=md==='R',P_=md==='P';
  q('#rdtabP').classList.toggle('on',P_);q('#rdtabR').classList.toggle('on',R_);
  q('#rdsrch').hidden=stg!=1;q('#rdv1').hidden=!(R_&&stg==1);q('#rdp1').hidden=!(P_&&stg==1);q('#rdv2').hidden=!(R_&&stg==2);q('#rdp2').hidden=!(P_&&stg==2);
- q('#rdform').hidden=!(P_&&stg==2);q('#rdedit').hidden=!(P_&&stg==2&&!!(posImgs&&posImgs.d));q('#rdpv').hidden=stg!=2;q('#rdmap').style.visibility=stg==1?'visible':'hidden';
+ q('#rdform').hidden=!(P_&&stg==2);q('#rdzm').hidden=!(P_&&stg==2);try{pvFit()}catch(e){}q('#rdedit').hidden=!(P_&&stg==2&&!!(posImgs&&posImgs.d));q('#rdpv').hidden=stg!=2;q('#rdmap').style.visibility=stg==1?'visible':'hidden';
  q('#rdguide').style.display='none'}
 function view(n){stg=n;ui()}
 function setMode(m){edReset();if(map&&m!==md){stopSel();stopP()}md=m;stg=(m==='P')?2:1;try{localStorage.setItem('kasetsu.rdmode',m)}catch(e){}ui();
@@ -1591,7 +1594,27 @@ function sheetCanvas(K,ui){
  x.strokeText('広域図',FX+2,y0);x.fillText('広域図',FX+2,y0);x.strokeText('詳細位置図',FX+2,yDl);x.fillText('詳細位置図',FX+2,yDl);
  const d=new Date();x.fillStyle='#555';x.font='9px '+FFN;x.textAlign='right';x.fillText('作成日:'+d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日',SW-FX,SH-12);
  x.setTransform(1,0,0,1,0,0);return c}
-function drawSheetPreview(msg){const c=q('#rdcv'),s=sheetCanvas(2,true);c.width=s.width;c.height=s.height;c.getContext('2d').drawImage(s,0,0);if(msg)st(msg,'ok')}
+var PZ=1;
+function pvFit(){const v=q('#rdpv'),c=q('#rdcv');c.classList.toggle('fitr',md!=='P');if(md!=='P'){c.style.width=c.style.height='';return}const aw=Math.max(50,v.clientWidth-24),ah=Math.max(50,v.clientHeight-24),k=Math.min(aw/595.28,ah/841.89)*PZ;c.style.width=(595.28*k)+'px';c.style.height=(841.89*k)+'px';q('#rdzv').textContent=Math.round(PZ*100)+'%'}
+function drawSheetPreview(msg){const c=q('#rdcv'),s=sheetCanvas(PZ>1.6?4:2,true);c.width=s.width;c.height=s.height;c.getContext('2d').drawImage(s,0,0);pvFit();if(msg)st(msg,'ok')}
+function pvZoom(nz,cx,cy){nz=Math.min(8,Math.max(1,nz));if(nz===PZ)return;const v=q('#rdpv'),c=q('#rdcv'),r=c.getBoundingClientRect(),vr=v.getBoundingClientRect();
+ if(cx==null){cx=vr.left+vr.width/2;cy=vr.top+vr.height/2}
+ const fx=(cx-r.left)/r.width,fy=(cy-r.top)/r.height,oldHi=PZ>1.6,old=PZ;PZ=nz;pvFit();
+ const r2=c.getBoundingClientRect();v.scrollLeft+=(r2.left+fx*r2.width)-cx;v.scrollTop+=(r2.top+fy*r2.height)-cy;
+ if((PZ>1.6)!==oldHi&&md==='P'&&stg===2)drawSheetPreview()}
+(function(){const v=q('#rdpv');
+ v.addEventListener('wheel',e=>{if(md!=='P'||stg!==2)return;e.preventDefault();pvZoom(PZ*(e.deltaY<0?1.15:1/1.15),e.clientX,e.clientY)},{passive:false});
+ q('#rdzi').onclick=()=>pvZoom(PZ*1.25);q('#rdzo').onclick=()=>pvZoom(PZ/1.25);q('#rdzf').onclick=()=>pvZoom(1);
+ window.addEventListener('resize',()=>{if(!q('#rdpv').hidden)pvFit()});
+ // 空白部分/Spaceキー/中ボタンのドラッグでパン
+ let pan=null;v.addEventListener('pointerdown',e=>{if(e.button===1||(e.target===v&&e.button===0)){pan={x:e.clientX,y:e.clientY,l:v.scrollLeft,t:v.scrollTop};v.setPointerCapture(e.pointerId);e.preventDefault()}});
+ v.addEventListener('pointermove',e=>{if(pan){v.scrollLeft=pan.l-(e.clientX-pan.x);v.scrollTop=pan.t-(e.clientY-pan.y)}});
+ const pe=()=>{pan=null};v.addEventListener('pointerup',pe);v.addEventListener('pointercancel',pe);
+ // 2本指ピンチ
+ const pts=new Map();let d0=0,z0=1;q('#rdcv').addEventListener('pointerdown',e=>{pts.set(e.pointerId,e)},true);
+ q('#rdcv').addEventListener('pointermove',e=>{if(!pts.has(e.pointerId))return;pts.set(e.pointerId,e);if(pts.size===2){const[a,b]=[...pts.values()],d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);if(!d0){d0=d;z0=PZ}else pvZoom(z0*d/d0,(a.clientX+b.clientX)/2,(a.clientY+b.clientY)/2)}},true);
+ const pu=e=>{pts.delete(e.pointerId);if(pts.size<2)d0=0};q('#rdcv').addEventListener('pointerup',pu,true);q('#rdcv').addEventListener('pointercancel',pu,true);
+})();
 function inDetail(e){if(md!=='P'||stg!==2||!LAYO)return false;const cv=q('#rdcv'),r=cv.getBoundingClientRect(),px=(e.clientX-r.left)/r.width*595.28,py=(e.clientY-r.top)/r.height*841.89;
  return px>=LAYO.dx&&px<=LAYO.dx+LAYO.dw&&py>=LAYO.dy&&py<=LAYO.dy+LAYO.dh}
 q('#rdcv').addEventListener('click',e=>{if(inDetail(e)&&!(posImgs&&posImgs.d))startPick()});
