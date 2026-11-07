@@ -1386,15 +1386,17 @@ lay.onpointerdown=e=>{if(pmode){e.preventDefault();return}if(!selecting)return;e
 lay.onpointermove=e=>{if(pmode||!selecting)return;const p=rel(e);if(fixedN())drawFixed(p);else if(p0)drawFree(p)};
 lay.onpointerup=e=>{if(pmode){placeP(rel(e));return}if(!selecting)return;if(fixedN()){if(rectPx)confirmSel()}else if(p0){p0=null;if(rectPx&&rectPx.w>=40)confirmSel();else{rect.style.display='none';rectPx=null}}};
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(selecting||pmode)&&q('#rdm').style.display==='flex'){e.stopPropagation();stopSel();stopP();st('指定を中止しました。')}},true);
+let busyAt=0;
 async function confirmSel(){
- if(busy)return;const r=rectPx;
+ if(busy&&Date.now()-busyAt<90000){stopSel();st('前の取得が実行中です。終わるまで(最大1分ほど)お待ちください。','err');return}
+ const r=rectPx;
  if(md==='P'){stopSel();return confirmPick(r)}
  const c=px2u(r.x+r.w/2,r.y+r.h/2),lat0=latU(c.my),lon0=deg(c.mx);
  let N=r.fixed?fixedN():calcN(r);stopSel();
  if(!isFinite(N)||N<=0){st('範囲を計算できませんでした。もう一度囲んでください。','err');return}
  N=N<100?Math.max(30,Math.round(N)):Math.round(N/10)*10;
  if(N>5000){st('範囲が広すぎます(縮尺 1/5000 を超えます)。地図を拡大して、囲み直してください。','err');return}
- geo={lat0,lon0,N};busy=true;st('線画データを取得中です…(数秒〜十数秒かかります)');
+ geo={lat0,lon0,N};busy=true;busyAt=Date.now();st('線画データを取得中です…(数秒〜十数秒かかります)');
  try{osm=await fetchBase(geo)}catch(err){busy=false;st('道路・建物データを取得できませんでした('+(err&&err.message||err)+')。時間をおいてもう一度お試しください。','err');return}
  busy=false;view(2);renderPreview()}
 // ---- 道路・建物データ取得(OpenStreetMap / Overpass)
@@ -1518,6 +1520,19 @@ async function fetchGsi(g){
  if(!nRoad)throw new Error('道路縁のデータが見つかりません(レイヤー: '+(Object.values(LAYN).join(',')||'なし')+')');
  return els}
 // 施設名(任意): OpenStreetMapから名前だけ取得。失敗しても線画は作る
+// ---- 横断歩道(OSM)だけを軽い問い合わせで取得。失敗時は再試行、成功した範囲は覚えておき、拡大縮小しても取り直さない
+const CRC=[];
+async function fetchCrossings(g){
+ const B=gbox(g);
+ for(const c of CRC){if(c.s<=B.s&&c.w<=B.w&&c.n>=B.n&&c.e>=B.e)return c.els}
+ const pl=(B.n-B.s)*.25,po=(B.e-B.w)*.25,P={s:B.s-pl,w:B.w-po,n:B.n+pl,e:B.e+po},bb=[P.s,P.w,P.n,P.e].map(v=>v.toFixed(6)).join(',');
+ const qy=`[out:json][timeout:40];(way["highway"~"^(footway|path|cycleway|pedestrian)$"]["footway"="crossing"](${bb});way["highway"="crossing"](${bb}););out geom qt;`;
+ let el=null,err=null;const dl=Date.now()+35000;
+ for(let k=0;k<3&&!el&&Date.now()<dl;k++){try{el=await Promise.race([overpassRace(qy),new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),18000))])}catch(e){err=e;await new Promise(r=>setTimeout(r,1000))}}
+ if(!el)throw err||new Error('横断歩道を取得できません');
+ const out=[];for(const e of el){if(e.type==='way'&&e.geometry&&e.geometry.length>1){const t=e.tags||{};out.push({type:'way',tags:{highway:'footway',footway:'crossing',width:t.width},geometry:e.geometry})}}
+ CRC.push({s:P.s,w:P.w,n:P.n,e:P.e,els:out});if(CRC.length>6)CRC.shift();return out}
+const isCrW=e=>e.type==='way'&&e.tags&&e.tags.footway==='crossing';
 async function fetchNames(g){
  const B=gbox(g),bb=[B.s,B.w,B.n,B.e].map(v=>v.toFixed(6)).join(',');
  const NT=['amenity','shop','tourism','office','leisure','healthcare','craft','historic','public_transport','man_made'];
@@ -1770,24 +1785,30 @@ async function fetchAllNames(g){
  const jOsm=(async()=>{for(let k=0;k<2;k++){try{return await to(fetchNames(g),30000)}catch(e){}}return[]})();
  const jAnno=(async()=>{try{return (await to(fetchGsi(g),30000)).filter(e=>e.tags&&e.tags.gsiAnno)}catch(e){return[]}})();
  const jG=(async()=>{try{return await to(fetchGoogleNames(g),30000)}catch(e){msg=' / Google取得失敗:'+(e&&e.message||e);return[]}})();
- [osm,anno,gm]=await Promise.all([jOsm,jAnno,jG]);
+ const jCr=(async()=>{try{return await to(fetchCrossings(g),40000)}catch(e){return null}})();
+ let crX=null;[osm,anno,gm,crX]=await Promise.all([jOsm,jAnno,jG,jCr]);
+ if(crX&&crX.length)osm=osm.filter(e=>!isCrW(e));
+ g.crN=(crX&&crX.length)?crX.length:osm.filter(isCrW).length;
  const out=[],seen=[];const near=(a,b)=>Math.abs(a.lat-b.lat)<.00025&&Math.abs(a.lon-b.lon)<.0003;
  const add=e=>{const nm=e.tags&&e.tags.name;if(!nm)return;if(seen.some(s=>s.n===nm&&near(s,e)))return;seen.push({n:nm,lat:e.lat,lon:e.lon});out.push(e)};
  gm.forEach(add);
  osm.filter(e=>!(e.tags&&e.tags.footway==='sidewalk')).forEach(e=>{if(e.type==='node')add(e);else out.push(e)});
  anno.forEach(add);
+ if(crX&&crX.length)crX.forEach(e=>out.push(e));
  g.nmCount=seen.length;g.nmMsg=msg;return out}
 async function fetchBase(g){
  if(q('#rdsrc').value==='img'){
   try{const ri=await fetchImg(g),els=[ri];g.src='img';g.nm=false;
    st('施設名を取得中…');
-   try{const keep=await fetchAllNames(g);if(keep.length){els.push(...keep);g.nm=true}st('施設名 '+(g.nmCount||0)+' 件を取得'+(g.nmMsg||''))}catch(e){st('施設名の取得に失敗しました')}
+   try{const keep=await fetchAllNames(g);if(keep.length){els.push(...keep);g.nm=true}st('施設名 '+(g.nmCount||0)+' 件を取得'+(g.nmMsg||'')+' / 横断歩道 '+(g.crN||0)+' 本'+(g.crN?'':'(取得できませんでした。「範囲を取り直す」で再取得できます)'))}catch(e){st('施設名の取得に失敗しました')}
    return els}
   catch(e){st('標準地図の画像変換ができなかったため('+(e&&e.message||e)+')、国土地理院ベクトルで作成します…','err')}}
  if(q('#rdsrc').value==='gsi'||q('#rdsrc').value==='img'){
   try{const els=await fetchGsi(g);g.src='gsi';g.nm=false;
    st('施設名・歩道データを取得中…');
-   try{const nm=await Promise.race([fetchNames(g),new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),12000))]);if(nm.length){els.push(...nm);g.nm=true}}catch(e){}
+   let nm=[],cr=null;try{nm=await Promise.race([fetchNames(g),new Promise((_,rj)=>setTimeout(()=>rj(new Error('timeout')),12000))])}catch(e){}
+   try{cr=await fetchCrossings(g)}catch(e){}
+   if(cr&&cr.length){const n2=nm.filter(e=>!isCrW(e));els.push(...n2,...cr);if(n2.length)g.nm=true}else if(nm.length){els.push(...nm);g.nm=true}
    return els}
   catch(e){st('国土地理院のデータを取得できなかったため(' +(e&&e.message||e)+')、OpenStreetMapで作成します…','err')}}
  g.src='osm';g.nm=false;return fetchOsm(g)}
