@@ -1263,7 +1263,7 @@ const q=s=>document.querySelector(s);
 const rad=d=>d*Math.PI/180,deg=r=>r*180/Math.PI;
 const myU=lat=>Math.log(Math.tan(Math.PI/4+rad(lat)/2));
 const latU=y=>deg(2*Math.atan(Math.exp(y))-Math.PI/2);
-const EP=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter'];
+const EP=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://overpass.private.coffee/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
 let map=null,gmP=null,selecting=false,geo=null,osm=null,rectPx=null,p0=null,busy=false,md=localStorage.getItem('kasetsu.rdmode')==='P'?'P':'R',stg=1,pmode=null,secPts=[],secMk=[],secLn=null,stampPt=null,stampMk=null,posD=null,posW=null,posGeo=null;
 const FW=515.28,FHW=250,FHD=300,FX=40;
 const lay=q('#rdlay'),rect=q('#rdrect');
@@ -1331,13 +1331,24 @@ async function fetchOsm(g,wide){
  const hw=(g.mw||g.N*PW)/2,hh=hw*(g.asp||RAT),pad=1.06,k=1/(R*Math.cos(rad(g.lat0))),cy=myU(g.lat0);
  const s=latU(cy-hh*pad*k),n=latU(cy+hh*pad*k),dl=deg(hw*pad*k),w=g.lon0-dl,e=g.lon0+dl;
  const bb=[s,w,n,e].map(v=>v.toFixed(6)).join(',');
+ const hwW=(g.mw||0)>3500?'motorway|trunk|primary|secondary|tertiary|motorway_link|trunk_link|primary_link|secondary_link':'motorway|trunk|primary|secondary|tertiary|unclassified|residential|motorway_link|trunk_link|primary_link|secondary_link';
  const nd=['amenity','shop','tourism','office','leisure'].map(t=>`node["name"]["${t}"](${bb});`).join('');
- const qq=wide?`[out:json][timeout:60];(way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|motorway_link|trunk_link|primary_link|secondary_link)$"](${bb});way["railway"~"^(rail|light_rail|subway|narrow_gauge)$"](${bb});way["waterway"~"^(river|canal|riverbank)$"](${bb});way["natural"="water"](${bb});relation["natural"="water"]["type"="multipolygon"](${bb}););out geom;`:`[out:json][timeout:40];(way["building"](${bb});way["highway"](${bb});way["railway"~"^(rail|light_rail|tram|subway|narrow_gauge)$"](${bb});way["waterway"](${bb});way["natural"="water"](${bb});relation["building"]["type"="multipolygon"](${bb});relation["natural"="water"]["type"="multipolygon"](${bb});relation["waterway"="riverbank"](${bb});${nd});out geom;`;
- let err=null;
- for(const u of EP){try{const ac=new AbortController(),t=setTimeout(()=>ac.abort(),45000);
-  const r=await fetch(u,{method:'POST',body:'data='+encodeURIComponent(qq),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ac.signal});clearTimeout(t);
-  if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();if(!j.elements)throw new Error('データなし');return j.elements}catch(e2){err=e2}}
- throw err||new Error('不明なエラー')}
+ const qq=wide?`[out:json][timeout:60];(way["highway"~"^(${hwW})$"](${bb});way["railway"~"^(rail|light_rail|subway|narrow_gauge)$"](${bb});way["waterway"~"^(river|canal|riverbank)$"](${bb});way["natural"="water"](${bb});relation["natural"="water"]["type"="multipolygon"](${bb}););out geom qt;`:`[out:json][timeout:40];(way["building"](${bb});way["highway"](${bb});way["railway"~"^(rail|light_rail|tram|subway|narrow_gauge)$"](${bb});way["waterway"](${bb});way["natural"="water"](${bb});relation["building"]["type"="multipolygon"](${bb});relation["natural"="water"]["type"="multipolygon"](${bb});relation["waterway"="riverbank"](${bb});${nd});out geom qt;`;
+ if(OCACHE.has(qq))return OCACHE.get(qq);
+ const pr=(async()=>{try{return await overpassRace(qq)}catch(e1){await new Promise(r=>setTimeout(r,1500));return await overpassRace(qq)}})();
+ OCACHE.set(qq,pr);pr.catch(()=>OCACHE.delete(qq));return pr}
+const OCACHE=new Map();
+// 複数サーバーへ時間差で同時リクエスト(3.5秒待っても返らない/失敗したら次のサーバーも起動)。最初に成功したものを採用し、残りは中断
+function overpassRace(qq){return new Promise((resolve,reject)=>{
+ const acs=[];let done=false,fails=0,next=0,lastErr=null;
+ const launch=()=>{if(done||next>=EP.length)return;const i=next++,ac=new AbortController();acs.push(ac);
+  const to=setTimeout(()=>ac.abort(),40000);setTimeout(launch,3500);
+  fetch(EP[i],{method:'POST',body:'data='+encodeURIComponent(qq),headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ac.signal})
+  .then(async r=>{if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();
+   if(!j.elements||(j.remark&&/runtime error|timed out|out of memory/i.test(j.remark)))throw new Error('サーバー側で処理できませんでした');return j.elements})
+  .then(el=>{clearTimeout(to);if(done)return;done=true;acs.forEach(a=>{try{a.abort()}catch(e){}});resolve(el)})
+  .catch(e=>{clearTimeout(to);lastErr=e;fails++;if(done)return;if(fails>=EP.length)reject(lastErr||new Error('不明なエラー'));else launch()})};
+ launch()})}
 function buildRings(rel){
  const key=p=>p[0].toFixed(7)+','+p[1].toFixed(7),pool=[];
  for(const m of rel.members||[]){if(m.type==='way'&&m.geometry&&(m.role==='outer'||m.role==='inner'||!m.role)){const pts=m.geometry.filter(p=>p&&p.lat!=null).map(p=>[p.lat,p.lon]);if(pts.length>1)pool.push(pts)}}
@@ -1454,9 +1465,9 @@ async function makePos(){
  if(mw>2500){st('詳細図の範囲が広すぎます(約2.5km以内)。地図を拡大してください。','err');return}
  let mult=+q('#rdwm').value||8;if(mw*mult>8000)mult=Math.max(2,Math.floor(8000/mw));
  const dg={lat0,lon0,mw,asp:FHD/FW},wg={lat0,lon0,mw:mw*mult,asp:FHW/FW};
- busy=true;st('詳細図のデータを取得中です…');
- try{const d=await fetchOsm(dg,false);st('広域図のデータを取得中です…');const w=await fetchOsm(wg,true);posD=d;posW=w}
- catch(err){busy=false;st('地図データを取得できませんでした('+(err&&err.message||err)+')。時間をおいてもう一度お試しください。','err');return}
+ busy=true;const t0=Date.now(),tk=setInterval(()=>st('詳細図・広域図のデータを同時に取得中です…(経過 '+Math.round((Date.now()-t0)/1000)+'秒)'),500);st('詳細図・広域図のデータを同時に取得中です…');
+ try{const[d,w]=await Promise.all([fetchOsm(dg,false),fetchOsm(wg,true)]);posD=d;posW=w;clearInterval(tk)}
+ catch(err){clearInterval(tk);busy=false;st('地図データを取得できませんでした('+(err&&err.message||err)+')。時間をおいてもう一度お試しください。','err');return}
  busy=false;posGeo={dg,wg,mult,sec:secPts.slice(),stamp:stampPt};stg=2;ui();drawSheetPreview()}
 function sheetCanvas(K){
  const SW=595.28,SH=841.89,c=document.createElement('canvas');c.width=Math.round(SW*K);c.height=Math.round(SH*K);
