@@ -1880,25 +1880,38 @@ function render(ctx,Wpx,els,g,o){
    if(ri){const{s:rs,ax:rx,ay:ry}=riT();for(const L of ri.lines){if(L.k!=='edge'&&L.k!=='thin')continue;addL(L.pts.map(pp=>[rx+pp[0]*rs,ry+pp[1]*rs]))}}
    for(const pp of ge)addL(pp);for(const pp of ge2)addL(pp);
    for(const b of sd){const hw=(b.w||2)*ppm/2;if(hw<=0)continue;const l1=offs(b.pts,hw),l2=offs(b.pts,-hw);if(l1&&l1.length===b.pts.length)addL(l1);if(l2&&l2.length===b.pts.length)addL(l2)}
-   // 縞(厚み th の帯)が縁線と最初に交わる距離を返す。中心線だけでなく帯全体で判定するので、角の斜めの縁線にも対応
-   const hit=(cx,cy,dx,dy,mx,ux,uy)=>{let best=mx;const hw=th/2+.5;
-    for(const e of eseg){
-     // 線分を局所座標(a=縞の厚み方向, b=縞の長さ方向)へ
-     let a1=(e[0]-cx)*ux+(e[1]-cy)*uy,b1=(e[0]-cx)*dx+(e[1]-cy)*dy,a2=(e[2]-cx)*ux+(e[3]-cy)*uy,b2=(e[2]-cx)*dx+(e[3]-cy)*dy;
+   // 縞(厚み th の帯)が縁線にふさがれる区間を、縞の長さ方向(-hl〜hl)で返す。帯全体で判定するので斜めの縁線にも対応
+   // 線分を格子に振り分けて、縞の近くの線分だけを調べる(描画時間の短縮)
+   const GC=Math.max(24,hl*3),grid=new Map(),stamp=new Int32Array(eseg.length);let stc=0;
+   eseg.forEach((e,i)=>{const x0=Math.floor(Math.min(e[0],e[2])/GC),x1=Math.floor(Math.max(e[0],e[2])/GC),y0=Math.floor(Math.min(e[1],e[3])/GC),y1=Math.floor(Math.max(e[1],e[3])/GC);
+    if((x1-x0+1)*(y1-y0+1)>400)return;
+    for(let gx=x0;gx<=x1;gx++)for(let gy=y0;gy<=y1;gy++){const k=gx+','+gy;let l=grid.get(k);if(!l){l=[];grid.set(k,l)}l.push(i)}});
+   const near=(cx,cy,r)=>{const res=[];stc++;const x0=Math.floor((cx-r)/GC),x1=Math.floor((cx+r)/GC),y0=Math.floor((cy-r)/GC),y1=Math.floor((cy+r)/GC);
+    for(let gx=x0;gx<=x1;gx++)for(let gy=y0;gy<=y1;gy++){const l=grid.get(gx+','+gy);if(!l)continue;for(const i of l){if(stamp[i]!==stc){stamp[i]=stc;res.push(eseg[i])}}}return res};
+   const blocks=(cx,cy,dx,dy,ux,uy,mx)=>{const hw=th/2+.5,out=[];
+    for(const e of near(cx,cy,mx+hw+2)){
+     if(Math.min(e[0],e[2])>cx+mx+hw+1||Math.max(e[0],e[2])<cx-mx-hw-1||Math.min(e[1],e[3])>cy+mx+hw+1||Math.max(e[1],e[3])<cy-mx-hw-1)continue;
+     const a1=(e[0]-cx)*ux+(e[1]-cy)*uy,b1=(e[0]-cx)*dx+(e[1]-cy)*dy,a2=(e[2]-cx)*ux+(e[3]-cy)*uy,b2=(e[2]-cx)*dx+(e[3]-cy)*dy;
      if(Math.max(a1,a2)<-hw||Math.min(a1,a2)>hw)continue;
-     if(Math.max(b1,b2)<=.4||Math.min(b1,b2)>=best)continue;
-     // 帯 |a|<=hw にクリップ
      let t0=0,t1=1;const da=a2-a1;
      if(Math.abs(da)<1e-9){if(Math.abs(a1)>hw)continue}
      else{let ta=(-hw-a1)/da,tb=(hw-a1)/da;if(ta>tb){const q=ta;ta=tb;tb=q}t0=Math.max(t0,ta);t1=Math.min(t1,tb);if(t0>t1)continue}
-     const bb1=b1+(b2-b1)*t0,bb2=b1+(b2-b1)*t1,lo=Math.min(bb1,bb2),hi=Math.max(bb1,bb2);
-     if(hi<=.4)continue;
-     const d=Math.max(lo,.4);if(d<best)best=d}
+     const bb1=b1+(b2-b1)*t0,bb2=b1+(b2-b1)*t1,lo=Math.min(bb1,bb2)-.9,hi=Math.max(bb1,bb2)+.9;
+     if(hi<-mx||lo>mx)continue;out.push([lo,hi])}
+    out.sort((p,q)=>p[0]-q[0]);const m=[];for(const v of out){if(m.length&&v[0]<=m[m.length-1][1])m[m.length-1][1]=Math.max(m[m.length-1][1],v[1]);else m.push(v.slice())}
+    return m};
+   // 空き区間のうち、中心を含むもの/なければ直前の縞に最も重なるもの(道路側)を選ぶ
+   const pick=(bl,mx,prev)=>{const fr=[];let cur=-mx;for(const v of bl){if(v[0]>cur)fr.push([cur,Math.min(v[0],mx)]);cur=Math.max(cur,v[1])}if(cur<mx)fr.push([cur,mx]);
+    if(!fr.length)return null;
+    for(const f of fr)if(f[0]<=0&&f[1]>=0)return f;
+    let best=null,bs=-1e9;
+    for(const f of fr){const sc=prev?Math.min(f[1],prev[1])-Math.max(f[0],prev[0]):(f[1]-f[0]);if(sc>bs){bs=sc;best=f}}
     return best};
-   for(const z of zb){let rest=sp/2;
+   for(const z of zb){let rest=sp/2,prev=null;
     for(let i=0;i<z.pts.length-1;i++){const a=z.pts[i],b=z.pts[i+1],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);if(len<1e-6)continue;const ux=dx/len,uy=dy/len;
      let d=rest;for(;d<=len;d+=sp){const cx=a[0]+ux*d,cy=a[1]+uy*d,px=-uy,py=ux;
-      let hp=hit(cx,cy,px,py,hl,ux,uy),hm=hit(cx,cy,-px,-py,hl,ux,uy);if(hp+hm<3){hp=hl;hm=hl}else{hp=Math.max(.6,hp-.9);hm=Math.max(.6,hm-.9)}
+      const f=pick(blocks(cx,cy,px,py,ux,uy,hl),hl,prev);if(!f||f[1]-f[0]<2){continue}
+      prev=f;const hp=f[1],hm=-f[0];
       ctx.beginPath();ctx.moveTo(cx-ux*th/2-px*hm,cy-uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2-px*hm,cy+uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2+px*hp,cy+uy*th/2+py*hp);ctx.lineTo(cx-ux*th/2+px*hp,cy-uy*th/2+py*hp);ctx.closePath();ctx.fill();ctx.stroke()}
      rest=d-len}}}
   ctx.strokeStyle='#555';ctx.lineWidth=.6;for(const c of thin){pl(c.pts);ctx.stroke()}
