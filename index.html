@@ -1729,12 +1729,12 @@ async function fetchImg(g){
   // 建物の塗り(輪郭の内側)。解像度を落として保持
   const fw=Math.min(W,cw*6),fh=Math.min(H,ch*6),fc=document.createElement('canvas');fc.width=fw;fc.height=fh;const f1=fc.getContext('2d');
   // 塗りは直線化した建物輪郭(閉じたもの)から作る → 線と塗りが一致する
-  let npoly=0;f1.fillStyle='rgb(219,236,250)';
+  let npoly=0;f1.fillStyle='rgb(241,241,241)';
   for(const l of r.lines){if(l.k!=='bld'||l.pts.length<4)continue;const a=l.pts[0],b=l.pts[l.pts.length-1];if(Math.hypot(a[0]-b[0],a[1]-b[1])>6*F)continue;
     f1.beginPath();l.pts.forEach((pt,i)=>{const x=pt[0]/F*fw/cw,y=pt[1]/F*fh/ch;i?f1.lineTo(x,y):f1.moveTo(x,y)});f1.closePath();f1.fill();npoly++}
   if(!npoly){const c0=document.createElement('canvas');c0.width=W;c0.height=H;
    const f0=c0.getContext('2d'),fi=f0.createImageData(W,H),fd=fi.data,FLm=r.fill;
-   for(let i=0,j=0;i<FLm.length;i++,j+=4)if(FLm[i]){fd[j]=219;fd[j+1]=236;fd[j+2]=250;fd[j+3]=255}
+   for(let i=0,j=0;i<FLm.length;i++,j+=4)if(FLm[i]){fd[j]=fd[j+1]=fd[j+2]=241;fd[j+3]=255}
    f0.putImageData(fi,0,0);f1.drawImage(c0,0,0,W,H,0,0,fw,fh);c0.width=c0.height=1}
   c2.width=c2.height=1;
   g.imgz=z;g.nl=lines.length;
@@ -1880,25 +1880,16 @@ function render(ctx,Wpx,els,g,o){
    if(ri){const{s:rs,ax:rx,ay:ry}=riT();for(const L of ri.lines){if(L.k!=='edge'&&L.k!=='thin')continue;addL(L.pts.map(pp=>[rx+pp[0]*rs,ry+pp[1]*rs]))}}
    for(const pp of ge)addL(pp);for(const pp of ge2)addL(pp);
    for(const b of sd){const hw=(b.w||2)*ppm/2;if(hw<=0)continue;const l1=offs(b.pts,hw),l2=offs(b.pts,-hw);if(l1&&l1.length===b.pts.length)addL(l1);if(l2&&l2.length===b.pts.length)addL(l2)}
-   // 縞(厚み th の帯)が縁線と最初に交わる距離を返す。中心線だけでなく帯全体で判定するので、角の斜めの縁線にも対応
-   const hit=(cx,cy,dx,dy,mx,ux,uy)=>{let best=mx;const hw=th/2+.5;
-    for(const e of eseg){
-     // 線分を局所座標(a=縞の厚み方向, b=縞の長さ方向)へ
-     let a1=(e[0]-cx)*ux+(e[1]-cy)*uy,b1=(e[0]-cx)*dx+(e[1]-cy)*dy,a2=(e[2]-cx)*ux+(e[3]-cy)*uy,b2=(e[2]-cx)*dx+(e[3]-cy)*dy;
-     if(Math.max(a1,a2)<-hw||Math.min(a1,a2)>hw)continue;
-     if(Math.max(b1,b2)<=.4||Math.min(b1,b2)>=best)continue;
-     // 帯 |a|<=hw にクリップ
-     let t0=0,t1=1;const da=a2-a1;
-     if(Math.abs(da)<1e-9){if(Math.abs(a1)>hw)continue}
-     else{let ta=(-hw-a1)/da,tb=(hw-a1)/da;if(ta>tb){const q=ta;ta=tb;tb=q}t0=Math.max(t0,ta);t1=Math.min(t1,tb);if(t0>t1)continue}
-     const bb1=b1+(b2-b1)*t0,bb2=b1+(b2-b1)*t1,lo=Math.min(bb1,bb2),hi=Math.max(bb1,bb2);
-     if(hi<=.4)continue;
-     const d=Math.max(lo,.4);if(d<best)best=d}
-    return best};
+   const hit=(cx,cy,dx,dy,mx)=>{let best=mx;for(const e of eseg){
+     const x1=e[0],y1=e[1],ex=e[2]-x1,ey=e[3]-y1;
+     if(Math.min(x1,e[2])>cx+Math.abs(dx)*mx+.5||Math.max(x1,e[2])<cx-Math.abs(dx)*mx-.5||Math.min(y1,e[3])>cy+Math.abs(dy)*mx+.5||Math.max(y1,e[3])<cy-Math.abs(dy)*mx-.5)continue;
+     const den=dx*ey-dy*ex;if(Math.abs(den)<1e-9)continue;
+     const t=((x1-cx)*ey-(y1-cy)*ex)/den,u=((x1-cx)*dy-(y1-cy)*dx)/den;
+     if(t>.4&&t<best&&u>=0&&u<=1)best=t}return best};
    for(const z of zb){let rest=sp/2;
     for(let i=0;i<z.pts.length-1;i++){const a=z.pts[i],b=z.pts[i+1],dx=b[0]-a[0],dy=b[1]-a[1],len=Math.hypot(dx,dy);if(len<1e-6)continue;const ux=dx/len,uy=dy/len;
      let d=rest;for(;d<=len;d+=sp){const cx=a[0]+ux*d,cy=a[1]+uy*d,px=-uy,py=ux;
-      let hp=hit(cx,cy,px,py,hl,ux,uy),hm=hit(cx,cy,-px,-py,hl,ux,uy);if(hp+hm<3){hp=hl;hm=hl}else{hp=Math.max(.6,hp-.9);hm=Math.max(.6,hm-.9)}
+      let hp=hit(cx,cy,px,py,hl),hm=hit(cx,cy,-px,-py,hl);if(hp+hm<3){hp=hl;hm=hl}else{hp=Math.max(.8,hp-.3);hm=Math.max(.8,hm-.3)}
       ctx.beginPath();ctx.moveTo(cx-ux*th/2-px*hm,cy-uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2-px*hm,cy+uy*th/2-py*hm);ctx.lineTo(cx+ux*th/2+px*hp,cy+uy*th/2+py*hp);ctx.lineTo(cx-ux*th/2+px*hp,cy-uy*th/2+py*hp);ctx.closePath();ctx.fill();ctx.stroke()}
      rest=d-len}}}
   ctx.strokeStyle='#555';ctx.lineWidth=.6;for(const c of thin){pl(c.pts);ctx.stroke()}
@@ -1907,7 +1898,7 @@ function render(ctx,Wpx,els,g,o){
   ctx.strokeStyle='#fff';ctx.lineWidth=.9;ctx.setLineDash([5,5]);for(const p of rw){pl(p);ctx.stroke()}ctx.setLineDash([])}
  if(o.bld||o.fill){ctx.miterLimit=2;
   if(ri&&o.fill&&ri.fill){const{s,ax,ay}=riT();ctx.save();ctx.imageSmoothingEnabled=true;ctx.drawImage(ri.fill,ax+ri.x0*s,ay+ri.y0*s,ri.cw*s,ri.ch*s);ctx.restore()}
-  for(const b of bl){poly(b.rings);ctx.fillStyle=o.fill?'#dbecfa':'#fff';ctx.fill('evenodd');if(o.bld&&!b.ns){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;ctx.stroke()}}
+  for(const b of bl){poly(b.rings);ctx.fillStyle=o.fill?'#f1f1f1':'#fff';ctx.fill('evenodd');if(o.bld&&!b.ns){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;ctx.stroke()}}
   if(o.bld){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=.7;for(const p of bll){pl(p);ctx.stroke()}}
   if(ri&&o.bld)riDraw(['bld'],'#2b2b2b',.7)}
  if(o.name){
