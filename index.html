@@ -2618,7 +2618,7 @@ function fit(fr,img){const r=Math.min(fr.w/img.w,fr.h/img.h);const w=img.w*r,h=i
 const tw=(t,f)=>{let w=0;for(const c of t)w+=c.charCodeAt(0)>255?f:f*.6;return w};
 function wrapT(t,f,w1,w){const out=[];String(t||'').split('\n').forEach(par=>{let line='',lw=0;for(const ch of par){const cw=ch.charCodeAt(0)>255?f:f*.6,lim=out.length?w:w1;if(lw+cw>lim&&line){out.push(line);line='';lw=0}line+=ch;lw+=cw}out.push(line)});return out}
 // 撮影方向+コメント(写真の外側に表示)
-function capSvg(f,d,i,ui){const c=f.cap,col=c.m=='col',f1=col?17:18,f2=col?14:15;
+function capSvg(f,d,i,ui){const c=f.cap,col=c.m=='col',f1=col?17:18,f2=f1;
  let h=`<g data-dir="${i}" style="cursor:pointer">`+E('rect',{x:c.x,y:c.y,width:c.w,height:c.h,fill:'#fff','fill-opacity':0,stroke:ui?'#bcd7f5':'none','stroke-width':1,'stroke-dasharray':'4 3','data-dir':i});
  const dir=d.dir||'',cm=d.cm||'';
  if(dir)h+=E('text',{x:c.x+2,y:c.y+f1,'font-size':f1,'font-weight':700,'font-family':FF,fill:'#111'},esc(dir));
@@ -2626,7 +2626,7 @@ function capSvg(f,d,i,ui){const c=f.cap,col=c.m=='col',f1=col?17:18,f2=col?14:15
  if(cm){let x0=c.x+2,y0=c.y+f1,w1=c.w-4;
   if(col){y0=c.y+f1+(dir?f2*1.5:0)}else if(dir){x0=c.x+2+tw(dir,f1)+14;w1=c.w-(x0-c.x)-2}
   const ls=wrapT(cm,f2,col?c.w-4:w1,c.w-4);
-  ls.forEach((ln,k)=>{const first=(k==0&&!col),x=first?x0:c.x+2,y=col?y0+k*f2*1.45:c.y+f1+k*f2*1.45;h+=E('text',{x,y,'font-size':f2,'font-family':FF,fill:'#111'},esc(ln))})}
+  ls.forEach((ln,k)=>{const first=(k==0&&!col),x=first?x0:c.x+2,y=col?y0+k*f2*1.45:c.y+f1+k*f2*1.45;h+=E('text',{x,y,'font-size':f2,'font-weight':700,'font-family':FF,fill:'#111'},esc(ln))})}
  return h+'</g>'}
 function dimTp(s){const[a,b]=s.p,dx=b[0]-a[0],dy=b[1]-a[1],ang=Math.atan2(dy,dx)*180/Math.PI,rot=s.tr!=null?s.tr:((ang>90||ang<=-90)?ang+180:ang),r=rot*Math.PI/180,lw=s.lw||2.5,o=lw/2+5,mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;return[mx+o*Math.sin(r),my-o*Math.cos(r)]}
 function dimSvg(s,on,ui){const[a,b]=s.p,dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,lw=s.lw||2.5,al=Math.max(12,lw*5.5),tk=Math.max(8,lw*3.5),nx=-uy*tk,ny=ux*tk,hw=al*.36;
@@ -2844,7 +2844,7 @@ const css=`#bpm{display:none;position:fixed;inset:0;z-index:30;background:#000a;
 #bpc .bpb{display:flex;gap:8px;justify-content:flex-end}#bpc .bpb button{padding:7px 16px}#bpgo{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:700}`;
 const stl=document.createElement('style');stl.textContent=css;document.head.appendChild(stl);
 const box=document.createElement('div');box.id='bpm';
-box.innerHTML=`<div id="bpc"><h3>📑 一括PDF出力</h3><div class="small">チェックした書類を、下の順番で1つのPDFにまとめます。</div>
+box.innerHTML=`<div id="bpc"><h3>📑 一括PDF出力・印刷</h3><div class="small">チェックした書類を、下の順番で1つのPDFにまとめます。</div>
 <div class="bpr"><input type="checkbox" id="bpP"><label for="bpP"><b>① 位置図(付近見取図)</b><span id="bpPs"></span></label></div>
 <div class="bpr"><input type="checkbox" id="bpR"><label for="bpR"><b>② 規制図(道路使用図・作図画面)</b><span id="bpRs"></span></label></div>
 <div class="bpr"><input type="checkbox" id="bpH"><label for="bpH"><b>③ 現況写真(全ページ)</b><span id="bpHs"></span></label></div>
@@ -2864,6 +2864,7 @@ async function openBatch(){
  const site=((q('#qsite').textContent||'').replace(/^現場:\s*/,'').trim()||'申請書類').replace(/[\\/:*?"<>|]/g,'_');
  q('#bpn').value='申請書類_'+site+'_'+ymd()+'.pdf'}
 window.openBatchPdf=openBatch;
+const natPrint=q('#prt')&&q('#prt').onclick;
 q('#bpx').onclick=()=>box.classList.remove('on');
 box.addEventListener('pointerdown',e=>{if(e.target===box)box.classList.remove('on')});
 let busy=false;
@@ -2886,7 +2887,8 @@ q('#bpgo').onclick=async()=>{
  }catch(e){say('出力に失敗しました:'+(e.message||e),'err')}
  busy=false;q('#bpgo').disabled=false;q('#bppr').disabled=false};
 q('#bppr').onclick=async()=>{
- if(busy)return;busy=true;q('#bpgo').disabled=true;q('#bppr').disabled=true;
+ if(busy)return;
+ if(q('#bpR').checked&&!q('#bpP').checked&&!q('#bpH').checked&&natPrint){box.classList.remove('on');natPrint();return}busy=true;q('#bpgo').disabled=true;q('#bppr').disabled=true;
  try{const items=await collect();say('印刷用に整えています…');
   const boxp=document.createElement('div');boxp.id='bpprint';let css='@media screen{#bpprint{display:none}}@media print{body.bpprt>*:not(#bpprint){display:none!important}html,body{margin:0!important;padding:0!important}#bpprint{display:block}.bpp{overflow:hidden;break-after:page;page-break-after:always}.bpp:last-child{break-after:auto;page-break-after:auto}.bpp img{width:100%;height:100%;display:block}}';
   const ims=[];
@@ -2900,6 +2902,7 @@ q('#bppr').onclick=async()=>{
  }catch(e){say('印刷の準備に失敗しました:'+(e.message||e),'err')}
  busy=false;q('#bpgo').disabled=false;q('#bppr').disabled=false};
 // ---- ボタン設置(上部ツールバー「出力」・左パネル「出力・表示」)
+if(q('#prt'))q('#prt').onclick=openBatch;
 const prtQ=document.querySelector('#qbar [data-q="prt"]');
 if(prtQ){const b=document.createElement('button');b.id='bpdfQ';b.title='位置図・規制図・現況写真をまとめて1つのPDFに出力';b.textContent='📑 一括PDF';b.onclick=openBatch;prtQ.parentNode.appendChild(b)}
 const prtS=document.getElementById('prt');
