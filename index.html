@@ -117,6 +117,17 @@ input[type=color]{width:38px;height:24px;padding:1px;cursor:pointer}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
+// SVG文字列→Image(BlobURL優先、失敗時dataURL)。巨大SVG・貼付画像入りでも画像化できるようにする
+window.__svgImg=function(x){
+ x=String(x).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g,'');
+ if(!/xmlns:xlink=/.test(x))x=x.replace('<svg','<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+ return new Promise(function(res,rej){
+  function tryUrl(url,rev,next){var im=new Image();im.onload=function(){if(rev)setTimeout(function(){URL.revokeObjectURL(url)},15000);res(im)};im.onerror=function(){if(rev)URL.revokeObjectURL(url);next()};im.src=url}
+  var bu=null;try{bu=URL.createObjectURL(new Blob([x],{type:'image/svg+xml;charset=utf-8'}))}catch(e){}
+  var du=function(){tryUrl('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x),false,function(){rej(new Error('SVGの画像化に失敗'))})};
+  if(bu)tryUrl(bu,true,du);else du()})};
+</script>
+<script>
 // ★ Firebaseコンソール「プロジェクトの設定」→ マイアプリ(Web)の firebaseConfig を貼り付け
 const FIREBASE_CONFIG={apiKey:"AIzaSyBXMNnDDjx4p4qXXFGn3BeDyCmQPdv7GSs",authDomain:"estate21-53c4c.firebaseapp.com",projectId:"estate21-53c4c",appId:"1:590459203733:web:9f91f570bff43783a06b9c"};
 (function(){
@@ -883,10 +894,9 @@ if(has){$('#trkUndo').onclick=()=>{it.tr.pts.pop();draw();props()};$('#trkClr').
 $('#trkNext').onclick=()=>{const r=trkSim(it),e=r.st[r.st.length-1],hl=it.l/2/S.mpp,c=JSON.parse(JSON.stringify(it));c.id=S.uid++;c.tr=null;c.x=e.F.x+e.ux*(r.P.fo/S.mpp-hl);c.y=e.F.y+e.uy*(r.P.fo/S.mpp-hl);c.a=Math.round((((Math.atan2(-e.uy,-e.ux)*180/Math.PI)%360)+360)%360*10)/10;S.items.push(c);S.sel=c.id;draw();props()}}}
 // ---- 出力
 $('#prt').onclick=()=>{annEditEnd();S.sel=null;draw();window.print()};
-$('#png').onclick=()=>{annEditEnd();draw(false);const x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+$('#defs defs').outerHTML),im=new Image(),k=cv.width/S.W;
-im.onload=()=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.drawImage(cv,0,0);g.drawImage(im,0,0,c.width,c.height);
-try{$('#out').src=c.toDataURL('image/png')}catch(e){alert('出力に失敗しました')}$('#modal').style.display='block';draw()};
-im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x.replace('<svg','<svg width="'+S.W*k+'" height="'+S.H*k+'"'))};
+$('#png').onclick=()=>{annEditEnd();draw(false);const x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+$('#defs defs').outerHTML),k=cv.width/S.W;
+window.__svgImg(x.replace('<svg','<svg width="'+S.W*k+'" height="'+S.H*k+'"')).then(im=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(cv,0,0);g.drawImage(im,0,0,c.width,c.height);
+try{$('#out').src=c.toDataURL('image/png')}catch(e){alert('出力に失敗しました')}$('#modal').style.display='block';draw()}).catch(()=>{alert('画像化に失敗しました');draw()})};
 $('#clr').onclick=()=>{S.items=[];S.lines=[];S.cl=null;S.cs=[];S.cv=null;S.sel=null;draw();props()};
 // ---- ラフター揚程図検討(側方吊り・断面)
 const CR={
@@ -2534,18 +2544,22 @@ apply(off);b.onclick=()=>apply(!document.body.classList.contains('qbar-off'));})
 const NS='http://www.w3.org/2000/svg',$=s=>document.querySelector(s);
 // A4縦 (210x297mm) を 1mm=4unit で扱う
 const W=840,H=1188;
+const FF="'Hiragino Sans','Yu Gothic','Meiryo',sans-serif";
+// 現況写真レイアウト(参考画像どおり)
+// 2枚: 写真を横いっぱい、撮影方向は写真の下 / 3枚: 写真左、撮影方向は右
 const LAY={
- 2:[{x:60,y:150,w:720,h:480},{x:60,y:660,w:720,h:480}],
- 3:[{x:60,y:130,w:720,h:330},{x:60,y:480,w:720,h:330},{x:60,y:830,w:720,h:330}]};
-const DIRS=['北から撮影','南から撮影','東から撮影','西から撮影'];
-const eFr=()=>({img:null,sh:[],dir:''});
+ 2:[{x:68,y:137,w:697,h:432,cap:{x:68,y:576,w:697,h:56,m:'row'}},{x:68,y:637,w:697,h:432,cap:{x:68,y:1076,w:697,h:80,m:'row'}}],
+ 3:[{x:68,y:113,w:490,h:304,cap:{x:577,y:113,w:200,h:300,m:'col'}},{x:68,y:453,w:490,h:304,cap:{x:577,y:453,w:200,h:300,m:'col'}},{x:68,y:793,w:490,h:304,cap:{x:577,y:793,w:200,h:300,m:'col'}}]};
+const OLD={2:[{x:60,y:150,w:720,h:480},{x:60,y:660,w:720,h:480}],3:[{x:60,y:130,w:720,h:330},{x:60,y:480,w:720,h:330},{x:60,y:830,w:720,h:330}]};
+const DIRS=['北方向から撮影','南方向から撮影','東方向から撮影','西方向から撮影'];
+const eFr=()=>({img:null,sh:[],dir:'',cm:''});
 const newPage=l=>({layout:l,fr:Array.from({length:l},eFr)});
-const newP=()=>({title:'● 現況写真',cur:0,pages:[newPage(2)]});
-let P=newP(),tool='sel',sel=null,mp=null,drag=null,col='#ef4444',op=.35,fs=22,pend=null,uid=1,cf=0;
+const newP=()=>({ver:2,title:'● 現況写真',cur:0,pages:[newPage(2)]});
+let P=newP(),tool='sel',sel=null,mp=null,drag=null,col='#ef4444',op=.35,fs=22,lwv=2.5,pend=null,uid=1,cf=0;
 const pg=()=>P.pages[P.cur],FRM=()=>LAY[pg().layout],hasImg=p=>p.fr.some(d=>d.img);
 const css=`#phm{display:none;position:fixed;inset:0;z-index:12;background:var(--bg);flex-direction:column}
 #phm.on{display:flex}#phbar,#phbar2{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;background:var(--pn);border-bottom:1px solid var(--bd)}
-#phbar2{background:var(--ac2)}#phbar2 input[type=text]{width:170px}
+#phbar2{background:var(--ac2)}#phbar2 input[type=text]{width:170px}#phtxt:disabled{background:#eee}
 #phbar button,#phbar2 button{padding:4px 10px}#phbar button.on{background:var(--ac2);outline:2px solid #2563eb}
 #phbar button.dg:hover,#phbar2 button.dg:hover{background:#fee2e2;border-color:#f87171;color:#b91c1c}
 #phbar .sp{flex:1}#phmain{flex:1;overflow:auto;padding:10px;display:flex;justify-content:center;background:#9aa3ad}
@@ -2554,14 +2568,17 @@ const css=`#phm{display:none;position:fixed;inset:0;z-index:12;background:var(--
 #phhint{font-size:12px;padding:3px 10px;background:#fff7d6;color:#78350f}
 #phpn{font-weight:700;min-width:54px;text-align:center}
 #phpr{display:none}
-@media print{body>*:not(#phm){display:none!important}#phm{position:static;display:block!important}#phbar,#phbar2,#phhint{display:none!important}#phmain{padding:0;background:#fff;overflow:visible;display:block}#phsv{display:none!important}#phpr{display:block}#phpr svg{display:block;width:210mm;height:297mm;page-break-after:always;break-after:page}#phpr svg:last-child{page-break-after:auto;break-after:auto}@page{size:A4 portrait;margin:0}}`;
+@media print{body.phprt>*:not(#phm){display:none!important}body.phprt #phm{position:static;display:block!important}body.phprt #phbar,body.phprt #phbar2,body.phprt #phhint{display:none!important}body.phprt #phmain{padding:0;background:#fff;overflow:visible;display:block}body.phprt #phsv{display:none!important}body.phprt #phpr{display:block}body.phprt #phpr svg{display:block;width:210mm;height:297mm;page-break-after:always;break-after:page}body.phprt #phpr svg:last-child{page-break-after:auto;break-after:auto}}`;
 const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 const m=document.createElement('div');m.id='phm';
 m.innerHTML=`<div id="phbar"><b>📷 現況写真</b>
-<button data-t="sel" class="on">選択/移動</button><button data-t="poly">▱ 多角形塗り</button><button data-t="dim">↔ 寸法</button><button data-t="text">T 文字</button>
+<button data-t="sel" class="on">選択/移動</button><button data-t="poly">▱ 多角形塗り</button><button data-t="dim">↔ 寸法</button><button data-t="text">T 文字</button><button data-t="vadd" title="選択中の多角形の辺をタップ→その位置に折れ点を追加">＋折れ点追加</button><button data-t="vdel" title="選択中の多角形の折れ点をタップ→削除">－折れ点削除</button>
+<label title="描いたあとも同じツールのまま続けて作図"><input type="checkbox" id="phlock">連続作図</label>
 <label>色 <input type="color" id="phcol" value="#ef4444"></label>
 <label>透過 <input type="range" id="phop" min="0" max="1" step=".05" value=".35" style="width:80px"></label>
-<label>文字 <input type="number" id="phfs" value="22" min="8" max="80" style="width:54px"></label>
+<label>文字 <input type="number" id="phfs" value="22" min="6" max="120" style="width:54px"></label>
+<label>線 <input type="number" id="phlw" value="2.5" min="0.5" max="20" step="0.5" style="width:50px"></label>
+<input type="text" id="phtxt" placeholder="選択した寸法値/文字を編集" style="width:150px" disabled>
 <button id="phdel">🗑 図形削除</button><button id="phrm" title="選んだ枠の写真を外す">写真を外す</button>
 <span class="sp"></span><button id="phpng">🖼 画像保存</button><button id="phpdf">📄 PDF保存(全ページ)</button><button id="phbp" title="位置図・規制図・現況写真をまとめて1つのPDFにします">📑 一括PDF</button><button id="phprt">🖨 印刷</button><button id="phx">✕ 閉じる</button></div>
 <div id="phbar2"><b>ページ</b>
@@ -2570,44 +2587,61 @@ m.innerHTML=`<div id="phbar"><b>📷 現況写真</b>
 <label>配置 <select id="phly"><option value="2">1ページ2枚</option><option value="3">1ページ3枚</option></select></label>
 <span style="width:10px"></span><b>撮影方向</b><span class="small" id="phcf"></span>
 <select id="phdsel"><option value="">(選択して挿入)</option>${DIRS.map(d=>`<option>${d}</option>`).join('')}<option value="__none">(方角を消す)</option></select>
-<input type="text" id="phdir" placeholder="直接入力もできます" maxlength="30"></div>
+<input type="text" id="phdir" placeholder="直接入力もできます" maxlength="30"><textarea id="phcm" rows="2" placeholder="コメント(撮影方向の横/下に表示・改行可)" style="width:280px;font-size:12px;vertical-align:middle"></textarea></div>
 <div id="phhint"></div><div id="phmain"><svg id="phsv" viewBox="0 0 ${W} ${H}" xmlns="${NS}"></svg><div id="phpr"></div></div><input type="file" id="phf" accept="image/*" hidden>`;
 document.body.appendChild(m);
 const sv=$('#phsv'),hint=$('#phhint');
-const HINT={sel:'枠をタップして選択(青枠)。写真の無い枠はタップで画像を挿入。左上の方角ラベルをタップで編集。',poly:'写真上を順にタップして頂点指定、ダブルタップ(または最初の点付近タップ)で確定。',dim:'写真上で2点をタップ→寸法値を入力。',text:'写真上をタップして文字を入力。'};
+const HINT={sel:'図形をタップで選択→ドラッグで移動。○をドラッグで伸縮/頂点移動、緑の小○をドラッグで折れ点追加、文字もドラッグで移動。ダブルタップで多角形の折れ点追加/削除・寸法値編集。撮影方向の欄をタップで入力。',poly:'写真上を順にタップして頂点指定、ダブルタップ(または最初の点付近タップ)で確定。',dim:'写真上で2点をタップ→寸法値を入力(作図後は選択状態になり移動・伸縮・文字編集できます)。',text:'写真上をタップして文字を入力。',vadd:'多角形を選択し、辺をタップするとその位置に折れ点を追加します。',vdel:'多角形を選択し、折れ点をタップすると削除します(3点以上を維持)。'};
 function setTool(t){tool=t;pend=null;m.querySelectorAll('[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t==t));hint.textContent=HINT[t];draw()}
 m.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>setTool(b.dataset.t));
 const E=(n,a,t)=>{let s='<'+n;for(const k in a)s+=` ${k}="${String(a[k]).replace(/"/g,'&quot;')}"`;return s+(t==null?'/>':'>'+t+'</'+n+'>')};
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function fit(fr,img){const r=Math.min(fr.w/img.w,fr.h/img.h);const w=img.w*r,h=img.h*r;return{x:fr.x+(fr.w-w)/2,y:fr.y+(fr.h-h)/2,w,h}}
 const tw=(t,f)=>{let w=0;for(const c of t)w+=c.charCodeAt(0)>255?f:f*.6;return w};
-function badge(x,y,t,i){const f=26,w=tw(t,f)+18;return `<g data-dir="${i}" style="cursor:pointer">`+E('rect',{x,y,width:w,height:40,fill:'#fff','fill-opacity':.93,stroke:'#111','stroke-width':1.5})+E('text',{x:x+9,y:y+29,'font-size':f,'font-weight':700,'font-family':'sans-serif',fill:'#111'},esc(t))+'</g>'}
+function wrapT(t,f,w1,w){const out=[];String(t||'').split('\n').forEach(par=>{let line='',lw=0;for(const ch of par){const cw=ch.charCodeAt(0)>255?f:f*.6,lim=out.length?w:w1;if(lw+cw>lim&&line){out.push(line);line='';lw=0}line+=ch;lw+=cw}out.push(line)});return out}
+// 撮影方向+コメント(写真の外側に表示)
+function capSvg(f,d,i,ui){const c=f.cap,col=c.m=='col',f1=col?17:18,f2=col?14:15;
+ let h=`<g data-dir="${i}" style="cursor:pointer">`+E('rect',{x:c.x,y:c.y,width:c.w,height:c.h,fill:'#fff','fill-opacity':0,stroke:ui?'#bcd7f5':'none','stroke-width':1,'stroke-dasharray':'4 3','data-dir':i});
+ const dir=d.dir||'',cm=d.cm||'';
+ if(dir)h+=E('text',{x:c.x+2,y:c.y+f1,'font-size':f1,'font-weight':700,'font-family':FF,fill:'#111'},esc(dir));
+ else if(ui&&!cm)h+=E('text',{x:c.x+2,y:c.y+f1,'font-size':13,'font-family':FF,fill:'#9aa3ad'},'撮影方向・コメント(タップで入力)');
+ if(cm){let x0=c.x+2,y0=c.y+f1,w1=c.w-4;
+  if(col){y0=c.y+f1+(dir?f2*1.5:0)}else if(dir){x0=c.x+2+tw(dir,f1)+14;w1=c.w-(x0-c.x)-2}
+  const ls=wrapT(cm,f2,col?c.w-4:w1,c.w-4);
+  ls.forEach((ln,k)=>{const first=(k==0&&!col),x=first?x0:c.x+2,y=col?y0+k*f2*1.45:c.y+f1+k*f2*1.45;h+=E('text',{x,y,'font-size':f2,'font-family':FF,fill:'#111'},esc(ln))})}
+ return h+'</g>'}
+function dimTp(s){const[a,b]=s.p,dx=b[0]-a[0],dy=b[1]-a[1],ang=Math.atan2(dy,dx)*180/Math.PI,rot=s.tr!=null?s.tr:((ang>90||ang<=-90)?ang+180:ang),r=rot*Math.PI/180,lw=s.lw||2.5,o=lw/2+5,mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;return[mx+o*Math.sin(r),my-o*Math.cos(r)]}
+function dimSvg(s,on,ui){const[a,b]=s.p,dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L,lw=s.lw||2.5,al=Math.max(12,lw*5.5),tk=Math.max(8,lw*3.5),nx=-uy*tk,ny=ux*tk,hw=al*.36;
+ const ang=Math.atan2(dy,dx)*180/Math.PI,rot=s.tr!=null?s.tr:((ang>90||ang<=-90)?ang+180:ang),tp=s.tp||dimTp(s);
+ let h=`<g data-s="${s.id}" style="cursor:move" stroke="${s.c}" fill="${s.c}">`;
+ if(ui)h+=E('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:'transparent','stroke-width':Math.max(24,lw+20),'stroke-linecap':'round',fill:'none'});
+ h+=E('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],'stroke-width':on?lw+1.5:lw})+E('line',{x1:a[0]-nx,y1:a[1]-ny,x2:a[0]+nx,y2:a[1]+ny,'stroke-width':lw})+E('line',{x1:b[0]-nx,y1:b[1]-ny,x2:b[0]+nx,y2:b[1]+ny,'stroke-width':lw})
+  +E('polygon',{points:`${a[0]},${a[1]} ${a[0]+ux*al-uy*hw},${a[1]+uy*al+ux*hw} ${a[0]+ux*al+uy*hw},${a[1]+uy*al-ux*hw}`,stroke:'none'})
+  +E('polygon',{points:`${b[0]},${b[1]} ${b[0]-ux*al-uy*hw},${b[1]-uy*al+ux*hw} ${b[0]-ux*al+uy*hw},${b[1]-uy*al-ux*hw}`,stroke:'none'})
+  +E('text',{x:tp[0],y:tp[1],transform:`rotate(${rot} ${tp[0]} ${tp[1]})`,'text-anchor':'middle','font-size':s.fs,'font-weight':700,'font-family':FF,stroke:'#fff','stroke-width':Math.max(4,s.fs/5),'paint-order':'stroke',fill:s.c,'data-part':'t',style:'cursor:move'},esc(s.t))+'</g>';
+ if(on){s.p.forEach((q,j)=>h+=E('circle',{cx:q[0],cy:q[1],r:11,fill:'#fff','fill-opacity':.9,stroke:'#2563eb','stroke-width':2.5,'data-v':j,'data-s':s.id,style:'cursor:crosshair'}));
+  h+=E('circle',{cx:tp[0],cy:tp[1],r:5,fill:'#2563eb','pointer-events':'none'})}
+ return h}
 // 1ページ分のSVG中身。ui=trueで編集用表示(選択枠・案内文)、falseで出力用
 function pageInner(p,ui,pi){
  const F=LAY[p.layout];
  let h='<defs>'+F.map((f,i)=>`<clipPath id="phc${pi}_${i}"><rect x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}"/></clipPath>`).join('')+'</defs>';
- h+=E('rect',{x:0,y:0,width:W,height:H,fill:'#fff'})+E('text',{x:60,y:96,'font-size':30,'font-weight':700,'font-family':'sans-serif','data-title':1,style:'cursor:pointer'},esc(P.title));
- F.forEach((f,i)=>{const d=p.fr[i];h+=`<g data-fr="${i}">`+E('rect',{x:f.x,y:f.y,width:f.w,height:f.h,fill:'#fff',stroke:'#0b3a4a','stroke-width':3,'data-f':i});
-  let bx=f.x,by=f.y;
-  if(!d.img){if(ui)h+=E('text',{x:f.x+f.w/2,y:f.y+f.h/2,'text-anchor':'middle','font-size':26,fill:'#9aa3ad','font-family':'sans-serif','pointer-events':'none'},'タップして写真を挿入')}
-  else{const b=fit(f,d.img);bx=b.x;by=b.y;h+=E('image',{href:d.img.src,x:b.x,y:b.y,width:b.w,height:b.h,preserveAspectRatio:'none','data-f':i})}
+ h+=E('rect',{x:0,y:0,width:W,height:H,fill:'#fff'})+E('text',{x:46,y:86,'font-size':21,'font-weight':700,'font-family':FF,'data-title':1,style:'cursor:pointer'},esc(P.title));
+ F.forEach((f,i)=>{const d=p.fr[i];h+=`<g data-fr="${i}">`+E('rect',{x:f.x,y:f.y,width:f.w,height:f.h,fill:'#fff',stroke:'#1f2d36','stroke-width':2.2,'data-f':i});
+  if(!d.img){if(ui)h+=E('text',{x:f.x+f.w/2,y:f.y+f.h/2,'text-anchor':'middle','font-size':22,fill:'#9aa3ad','font-family':FF,'pointer-events':'none'},'タップして写真を挿入')}
+  else{const b=fit(f,d.img);h+=E('image',{href:d.img.src,x:b.x,y:b.y,width:b.w,height:b.h,preserveAspectRatio:'none','data-f':i})}
   h+=`<g clip-path="url(#phc${pi}_${i})">`;
   for(const s of d.sh){const on=ui&&sel&&sel.s===s;
-   if(s.k=='poly'){h+=E('polygon',{points:s.p.map(q=>q.join(',')).join(' '),fill:s.c,'fill-opacity':s.o,stroke:s.c,'stroke-width':on?4:2,'data-s':s.id,style:'cursor:move'});
-    if(on)s.p.forEach((q,j)=>h+=E('circle',{cx:q[0],cy:q[1],r:9,fill:'#fff',stroke:'#2563eb','stroke-width':2,'data-v':j,'data-s':s.id,style:'cursor:crosshair'}))}
-   else if(s.k=='dim'){const[a,b]=s.p,dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy)||1,nx=-dy/L*10,ny=dx/L*10,ang=Math.atan2(dy,dx)*180/Math.PI,mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,rot=(ang>90||ang<-90)?ang+180:ang;
-    h+=`<g data-s="${s.id}" style="cursor:move" stroke="${s.c}" fill="${s.c}">`+E('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],'stroke-width':on?4:2.5})+E('line',{x1:a[0]-nx,y1:a[1]-ny,x2:a[0]+nx,y2:a[1]+ny,'stroke-width':2.5})+E('line',{x1:b[0]-nx,y1:b[1]-ny,x2:b[0]+nx,y2:b[1]+ny,'stroke-width':2.5})
-     +E('polygon',{points:`${a[0]},${a[1]} ${a[0]+dx/L*14-dy/L*5},${a[1]+dy/L*14+dx/L*5} ${a[0]+dx/L*14+dy/L*5},${a[1]+dy/L*14-dx/L*5}`,stroke:'none'})
-     +E('polygon',{points:`${b[0]},${b[1]} ${b[0]-dx/L*14-dy/L*5},${b[1]-dy/L*14+dx/L*5} ${b[0]-dx/L*14+dy/L*5},${b[1]-dy/L*14-dx/L*5}`,stroke:'none'})
-     +E('text',{x:mx,y:my-6,transform:`rotate(${rot} ${mx} ${my})`,'text-anchor':'middle','font-size':s.fs,'font-weight':700,'font-family':'sans-serif',stroke:'#fff','stroke-width':5,'paint-order':'stroke',fill:s.c},esc(s.t))+'</g>';
-    if(on)s.p.forEach((q,j)=>h+=E('circle',{cx:q[0],cy:q[1],r:9,fill:'#fff',stroke:'#2563eb','stroke-width':2,'data-v':j,'data-s':s.id,style:'cursor:crosshair'}))}
-   else if(s.k=='text'){h+=E('text',{x:s.p[0][0],y:s.p[0][1],'font-size':s.fs,'font-weight':700,'font-family':'sans-serif',stroke:'#fff','stroke-width':5,'paint-order':'stroke',fill:s.c,'data-s':s.id,style:'cursor:move'},esc(s.t));
-    if(on)h+=E('circle',{cx:s.p[0][0],cy:s.p[0][1],r:6,fill:'#2563eb'})}
+   if(s.k=='poly'){const n=s.p.length;h+=E('polygon',{points:s.p.map(q=>q.join(',')).join(' '),fill:s.c,'fill-opacity':s.o,stroke:s.c,'stroke-width':(s.lw||2)+(on?1.5:0),'data-s':s.id,style:'cursor:move'});
+    if(on){for(let j=0;j<n;j++){const a=s.p[j],b=s.p[(j+1)%n];h+=E('circle',{cx:(a[0]+b[0])/2,cy:(a[1]+b[1])/2,r:6,fill:'#22c55e','fill-opacity':.85,stroke:'#fff','stroke-width':1.5,'data-m':j,'data-s':s.id,style:'cursor:copy'})}
+     s.p.forEach((q,j)=>h+=E('circle',{cx:q[0],cy:q[1],r:10,fill:'#fff',stroke:'#2563eb','stroke-width':2.5,'data-v':j,'data-s':s.id,style:'cursor:crosshair'}))}}
+   else if(s.k=='dim')h+=dimSvg(s,on,ui);
+   else if(s.k=='text'){h+=E('text',{x:s.p[0][0],y:s.p[0][1],'font-size':s.fs,'font-weight':700,'font-family':FF,stroke:'#fff','stroke-width':Math.max(4,s.fs/5),'paint-order':'stroke',fill:s.c,'data-s':s.id,style:'cursor:move'},esc(s.t));
+    if(on)h+=E('circle',{cx:s.p[0][0],cy:s.p[0][1],r:6,fill:'#2563eb','pointer-events':'none'})}
   }
   h+='</g>';
-  if(d.dir)h+=badge(bx,by,d.dir,i);   // 画像左上に撮影方向
-  if(ui&&i===cf)h+=E('rect',{x:f.x-2,y:f.y-2,width:f.w+4,height:f.h+4,fill:'none',stroke:'#2563eb','stroke-width':5,'pointer-events':'none'});
-  h+='</g>'});
+  if(ui&&i===cf)h+=E('rect',{x:f.x-2,y:f.y-2,width:f.w+4,height:f.h+4,fill:'none',stroke:'#2563eb','stroke-width':4,'pointer-events':'none'});
+  h+='</g>'+capSvg(f,d,i,ui)});
  return h}
 function draw(){
  let h=pageInner(pg(),true,P.cur);
@@ -2616,7 +2650,7 @@ function draw(){
  sv.innerHTML=h}
 function syncBar(){
  $('#phpn').textContent=(P.cur+1)+' / '+P.pages.length;$('#phly').value=pg().layout;
- const d=pg().fr[cf]||pg().fr[0];$('#phdir').value=d.dir||'';$('#phdsel').value=DIRS.includes(d.dir)?d.dir:'';
+ const d=pg().fr[cf]||pg().fr[0];$('#phdir').value=d.dir||'';$('#phcm').value=d.cm||'';$('#phdsel').value=DIRS.includes(d.dir)?d.dir:'';
  $('#phcf').textContent='(対象:枠'+(cf+1)+')';
  $('#phpv').disabled=P.cur<=0;$('#phnx').disabled=P.cur>=P.pages.length-1}
 const pt=e=>{const r=sv.getBoundingClientRect();return[(e.clientX-r.left)/r.width*W,(e.clientY-r.top)/r.height*H]};
@@ -2627,46 +2661,73 @@ $('#phf').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileR
   // 長辺1600pxに縮小して保存容量を抑える
   const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
   const d=pg().fr[m._fi];d.img={src:c.toDataURL('image/jpeg',.88),w:c.width,h:c.height};d.sh=[];cf=m._fi;draw();syncBar();persist()};im.src=rd.result};rd.readAsDataURL(f)};
-let lastTap=0;
+let lastTap=0,lastDn={t:0,x:0,y:0};
+const snapHV=(o,p)=>{const dx=p[0]-o[0],dy=p[1]-o[1],L=Math.hypot(dx,dy);if(L<1)return p;const a=Math.abs(Math.atan2(dy,dx))*180/Math.PI;if(a<3||a>177)return[p[0],o[1]];if(Math.abs(a-90)<3)return[o[0],p[1]];return p};
+function polyAdd(s,p,tol){tol=tol||40;const n=s.p.length;let best=-1,bd=1e9,bq=null;
+ for(let j=0;j<n;j++){const a=s.p[j],b=s.p[(j+1)%n],dx=b[0]-a[0],dy=b[1]-a[1],L2=dx*dx+dy*dy||1;let t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/L2;t=Math.max(.02,Math.min(.98,t));const q=[a[0]+dx*t,a[1]+dy*t],d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<bd){bd=d;best=j;bq=q}}
+ if(best<0||bd>tol)return false;s.p.splice(best+1,0,bq);return true}
+function polyDel(s,p,tol){tol=tol||40;if(s.p.length<=3)return false;let best=-1,bd=1e9;s.p.forEach((q,j)=>{const d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<bd){bd=d;best=j}});if(best<0||bd>tol)return false;s.p.splice(best,1);return true}
+const done=()=>{if(!$('#phlock').checked)setTool('sel');else draw()};
 sv.addEventListener('pointerdown',e=>{
- const p=pt(e),t=e.target,i=frOf(p);
+ const p=pt(e),t=e.target,i=frOf(p),now=Date.now();
+ const dbl=(now-lastDn.t<380&&Math.hypot(p[0]-lastDn.x,p[1]-lastDn.y)<14);lastDn={t:now,x:p[0],y:p[1]};
  if(t.dataset&&t.dataset.title!=null){const v=prompt('見出し',P.title);if(v!=null){P.title=v;draw();persist()}return}
- const bd=t.closest&&t.closest('[data-dir]');
- if(bd&&tool=='sel'){const k=+bd.dataset.dir;cf=k;const v=prompt('撮影方向(例:北から撮影)',pg().fr[k].dir||'');if(v!=null){pg().fr[k].dir=v.trim();persist()}draw();syncBar();return}
+ const cap=t.closest&&t.closest('[data-dir]');
+ if(cap&&!pend&&tool=='sel'){e.preventDefault();const k=+cap.dataset.dir;cf=k;sel=null;draw();syncBar();syncUI();const d=pg().fr[k];setTimeout(()=>$(d.dir?'#phcm':'#phdir').focus(),60);return}
  if(i>=0&&i!==cf&&!pend){cf=i;syncBar()}
+ const sg=t.closest&&t.closest('[data-s]'),sid=sg&&sg.dataset.s;
+ if(tool=='vadd'||tool=='vdel'){
+  const r=sid?find(sid):sel;if(!r||r.s.k!='poly'){hint.textContent='先に多角形をタップして選択してください。';return}
+  sel=r;cf=r.i;if(tool=='vadd')polyAdd(r.s,p);else polyDel(r.s,p);draw();persist();syncUI();return}
  if(tool=='sel'){
-  const sid=t.dataset&&t.dataset.s;
-  if(sid){const r=find(sid);sel=r;cf=r.i;if(t.dataset.v!=null)drag={r,v:+t.dataset.v};else drag={r,p0:p,o:JSON.parse(JSON.stringify(r.s.p))};sv.setPointerCapture(e.pointerId);draw();syncBar();syncUI();return}
+  if(sid){const r=find(sid);if(!r)return;const was=sel&&sel.s===r.s;sel=r;cf=r.i;
+   if(dbl&&was){
+    if(r.s.k=='poly'){if(!polyDel(r.s,p,14))polyAdd(r.s,p,16);drag=null;draw();persist();syncUI();return}
+    const ti=$('#phtxt');if(!ti.disabled){ti.focus();ti.select()}return}
+   const ds=t.dataset||{};
+   if(ds.m!=null){const j=+ds.m,a=r.s.p[j],b=r.s.p[(j+1)%r.s.p.length];r.s.p.splice(j+1,0,[(a[0]+b[0])/2,(a[1]+b[1])/2]);drag={r,v:j+1}}
+   else if(ds.v!=null)drag={r,v:+ds.v};
+   else if(ds.part=='t'&&r.s.k=='dim')drag={r,part:'t',p0:p,otp:r.s.tp?r.s.tp.slice():dimTp(r.s)};
+   else drag={r,p0:p,o:JSON.parse(JSON.stringify(r.s.p)),otp:r.s.tp?r.s.tp.slice():null};
+   sv.setPointerCapture(e.pointerId);draw();syncBar();syncUI();return}
   sel=null;draw();syncUI();
   if(i>=0&&!pg().fr[i].img){pickImg(i)}
   return}
  if(i<0||!pg().fr[i].img){if(i>=0)pickImg(i);return}
  const d=pg().fr[i];
  if(tool=='poly'){
-  const now=Date.now();
+  const now2=Date.now();
   if(!pend)pend={k:'poly',i,p:[p]};
   else{if(pend.i!=i)return;const f0=pend.p[0];
-   if((pend.p.length>=3&&Math.hypot(p[0]-f0[0],p[1]-f0[1])<16)||(now-lastTap<350&&pend.p.length>=3)){finishPoly();return}
+   if((pend.p.length>=3&&Math.hypot(p[0]-f0[0],p[1]-f0[1])<16)||(now2-lastTap<350&&pend.p.length>=3)){finishPoly();return}
    pend.p.push(p)}
-  lastTap=now;draw();return}
+  lastTap=now2;draw();return}
  if(tool=='dim'){
   if(!pend)pend={k:'dim',i,p:[p]};
-  else if(pend.i==i){const a=pend.p[0],len=Math.round(Math.hypot(p[0]-a[0],p[1]-a[1]));if(len<6){return}const v=prompt('寸法値(例: 3,500 / 3.5m)','');pend=null;if(v==null){draw();return}
-   const s={id:uid++,k:'dim',p:[a,p],t:v,c:col,fs};d.sh.push(s);sel={s,i};persist()}
+  else if(pend.i==i){const a=pend.p[0],q=snapHV(a,p),len=Math.round(Math.hypot(q[0]-a[0],q[1]-a[1]));if(len<6){return}const v=prompt('寸法値(例: 3,500 / 3.5m)','');pend=null;if(v==null){draw();return}
+   const s={id:uid++,k:'dim',p:[a,q],t:v,c:col,fs,lw:lwv};d.sh.push(s);sel={s,i};persist();syncUI();done();return}
   draw();return}
- if(tool=='text'){const v=prompt('文字を入力','');if(v){const s={id:uid++,k:'text',p:[p],t:v,c:col,fs};d.sh.push(s);sel={s,i};persist()}draw();return}
+ if(tool=='text'){const v=prompt('文字を入力','');if(v){const s={id:uid++,k:'text',p:[p],t:v,c:col,fs};d.sh.push(s);sel={s,i};persist();syncUI();done();return}draw();return}
 });
-function finishPoly(){if(pend&&pend.p.length>=3){const s={id:uid++,k:'poly',p:pend.p.slice(),c:col,o:op};pg().fr[pend.i].sh.push(s);sel={s,i:pend.i};persist()}pend=null;draw()}
-sv.addEventListener('dblclick',e=>{if(tool=='poly'&&pend){if(pend.p.length>3)pend.p.pop();finishPoly();return}
- const sid=e.target.dataset&&e.target.dataset.s;if(sid){const r=find(sid);if(r&&r.s.t!=null){const v=prompt('文字を編集',r.s.t);if(v!=null){r.s.t=v;draw();persist()}}}});
+function finishPoly(){if(pend&&pend.p.length>=3){const s={id:uid++,k:'poly',p:pend.p.slice(),c:col,o:op,lw:lwv};pg().fr[pend.i].sh.push(s);sel={s,i:pend.i};persist();pend=null;syncUI();done();return}pend=null;draw()}
+sv.addEventListener('dblclick',e=>{if(tool=='poly'&&pend){if(pend.p.length>3)pend.p.pop();finishPoly();return}});
 sv.addEventListener('pointermove',e=>{const p=pt(e);
- if(drag){const s=drag.r.s;if(drag.v!=null){s.p[drag.v]=p}else{const dx=p[0]-drag.p0[0],dy=p[1]-drag.p0[1];s.p=drag.o.map(q=>[q[0]+dx,q[1]+dy])}draw();return}
+ if(drag){const s=drag.r.s;
+  if(drag.part=='t'){s.tp=[drag.otp[0]+p[0]-drag.p0[0],drag.otp[1]+p[1]-drag.p0[1]]}
+  else if(drag.v!=null){s.p[drag.v]=(s.k=='dim'&&!e.shiftKey)?snapHV(s.p[1-drag.v],p):p}
+  else{const dx=p[0]-drag.p0[0],dy=p[1]-drag.p0[1];s.p=drag.o.map(q=>[q[0]+dx,q[1]+dy]);if(drag.otp)s.tp=[drag.otp[0]+dx,drag.otp[1]+dy]}
+  draw();return}
  if(pend){mp=p;draw()}});
 sv.addEventListener('pointerup',()=>{if(drag){drag=null;persist()}});
-function syncUI(){if(sel){$('#phcol').value=sel.s.c;if(sel.s.o!=null)$('#phop').value=sel.s.o;if(sel.s.fs)$('#phfs').value=sel.s.fs;col=sel.s.c}}
+sv.addEventListener('pointercancel',()=>{if(drag){drag=null;persist()}});
+function syncUI(){const ti=$('#phtxt');
+ if(sel){$('#phcol').value=sel.s.c;if(sel.s.o!=null)$('#phop').value=sel.s.o;if(sel.s.fs)$('#phfs').value=sel.s.fs;$('#phlw').value=sel.s.lw||(sel.s.k=='dim'?2.5:2);col=sel.s.c;ti.disabled=sel.s.t==null;ti.value=sel.s.t!=null?sel.s.t:''}
+ else{ti.disabled=true;ti.value=''}}
 $('#phcol').oninput=e=>{col=e.target.value;if(sel){sel.s.c=col;draw();persist()}};
 $('#phop').oninput=e=>{op=+e.target.value;if(sel&&sel.s.o!=null){sel.s.o=op;draw();persist()}};
 $('#phfs').oninput=e=>{fs=+e.target.value||22;if(sel&&sel.s.fs){sel.s.fs=fs;draw();persist()}};
+$('#phlw').oninput=e=>{lwv=+e.target.value||2.5;if(sel&&sel.s.k!='text'){sel.s.lw=lwv;draw();persist()}};
+$('#phtxt').oninput=e=>{if(sel&&sel.s.t!=null){sel.s.t=e.target.value;draw();persist()}};
 function delSel(){if(!sel)return;const a=pg().fr[sel.i].sh,k=a.indexOf(sel.s);if(k>=0)a.splice(k,1);sel=null;draw();persist()}
 $('#phdel').onclick=delSel;
 $('#phrm').onclick=()=>{const d=pg().fr[cf];if(!d||!d.img){alert('枠'+(cf+1)+'には写真がありません。');return}if(confirm('枠'+(cf+1)+'の写真と図形を消します。よろしいですか?')){d.img=null;d.sh=[];sel=null;draw();persist()}};
@@ -2674,6 +2735,7 @@ $('#phrm').onclick=()=>{const d=pg().fr[cf];if(!d||!d.img){alert('枠'+(cf+1)+'�
 function setDir(v){const d=pg().fr[cf];if(!d)return;d.dir=v;draw();syncBar();persist()}
 $('#phdsel').onchange=e=>{const v=e.target.value;if(!v)return;setDir(v=='__none'?'':v)};
 $('#phdir').oninput=e=>{const d=pg().fr[cf];if(!d)return;d.dir=e.target.value;draw();$('#phdsel').value=DIRS.includes(d.dir)?d.dir:'';persist()};
+$('#phcm').oninput=e=>{const d=pg().fr[cf];if(!d)return;d.cm=e.target.value;draw();persist()};
 // ---- ページ操作(追加・削除・移動)・配置切替
 function goPage(n){P.cur=Math.max(0,Math.min(P.pages.length-1,n));cf=0;sel=null;pend=null;draw();syncBar();persist()}
 $('#phpv').onclick=()=>goPage(P.cur-1);$('#phnx').onclick=()=>goPage(P.cur+1);
@@ -2693,7 +2755,7 @@ document.addEventListener('keydown',e=>{if(!m.classList.contains('on'))return;if
  if(e.key=='Delete'||e.key=='Backspace'){delSel();e.preventDefault()}else if(e.key=='Escape'){if(pend){pend=null;draw()}else setTool('sel')}else if(e.key=='Enter'&&pend&&pend.k=='poly')finishPoly()});
 // ---- 出力(全ページ)
 function pageSvgStr(pi,K){return `<svg xmlns="${NS}" viewBox="0 0 ${W} ${H}" width="${W*K}" height="${H*K}">`+pageInner(P.pages[pi],false,pi)+'</svg>'}
-function pageCanvas(pi,K){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=W*K;c.height=H*K;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);res(c)};im.onerror=()=>rej(new Error('画像化に失敗'));im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(pageSvgStr(pi,K))})}
+function pageCanvas(pi,K){return window.__svgImg(pageSvgStr(pi,K)).then(im=>{const c=document.createElement('canvas');c.width=W*K;c.height=H*K;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);return c})}
 async function ensureLoaded(){if(!m.classList.contains('on'))await restore()}
 window.genkyoPhotoInfo=async()=>{await ensureLoaded();return P.pages.filter(hasImg).length};
 window.genkyoPhotoCanvases=async K=>{await ensureLoaded();const out=[];for(let i=0;i<P.pages.length;i++)if(hasImg(P.pages[i]))out.push(await pageCanvas(i,K||2));return out};
@@ -2703,7 +2765,7 @@ $('#phpdf').onclick=async()=>{try{const cs=await window.genkyoPhotoCanvases(2);i
  const b=await window.__pdfMake(cs.map(c=>({c,pw:595.28,ph:841.89})));window.__dlBlob(b,'現況写真_'+ymd()+'.pdf')}catch(e){alert('PDF作成に失敗しました')}};
 $('#phbp').onclick=()=>{persistNow();window.openBatchPdf&&window.openBatchPdf()};
 $('#phprt').onclick=()=>{sel=null;pend=null;draw();const box=$('#phpr');box.innerHTML=P.pages.map((p,i)=>hasImg(p)||P.pages.length==1?pageSvgStr(i,1):'').join('');
- const clean=()=>{box.innerHTML='';window.removeEventListener('afterprint',clean)};window.addEventListener('afterprint',clean);window.print()};
+ document.body.classList.add('phprt');let ps=document.getElementById('phpgs');if(!ps){ps=document.createElement('style');ps.id='phpgs';document.head.appendChild(ps)}ps.textContent='@page{size:A4 portrait;margin:0}';const clean=()=>{box.innerHTML='';document.body.classList.remove('phprt');ps.textContent='';window.removeEventListener('afterprint',clean)};window.addEventListener('afterprint',clean);setTimeout(()=>window.print(),50)};
 $('#phx').onclick=()=>{m.classList.remove('on');persistNow()};
 // ---- 保存(現場ごと)
 let pt0=0;
@@ -2713,7 +2775,8 @@ function persistNow(){clearTimeout(pt0);saveNow()}
 async function restore(){P=newP();uid=1;cf=0;try{const a=window.siteApi;if(a&&a.cur()){const d=await a.get('ph:'+a.cur());if(d&&d.P){let q=d.P;
   if(!q.pages)q={title:q.title||'● 現況写真',cur:0,pages:[{layout:2,fr:(q.fr||[]).map(f=>({img:f.img||null,sh:f.sh||[],dir:f.dir||''}))}]};
   if(!q.pages.length)q.pages=[newPage(2)];
-  q.pages.forEach(p=>{p.layout=p.layout==3?3:2;p.fr=p.fr||[];while(p.fr.length<p.layout)p.fr.push(eFr());p.fr.length=p.layout;p.fr.forEach(f=>{f.sh=f.sh||[];f.dir=f.dir||''})});
+  q.pages.forEach(p=>{p.layout=p.layout==3?3:2;p.fr=p.fr||[];while(p.fr.length<p.layout)p.fr.push(eFr());p.fr.length=p.layout;p.fr.forEach((f,i)=>{f.sh=f.sh||[];f.dir=f.dir||'';f.cm=f.cm||'';
+   if(!q.ver&&f.img&&f.sh.length){const ob=fit(OLD[p.layout][i],f.img),nb=fit(LAY[p.layout][i],f.img),mp2=a=>[nb.x+(a[0]-ob.x)/ob.w*nb.w,nb.y+(a[1]-ob.y)/ob.h*nb.h];f.sh.forEach(s=>{s.p=s.p.map(mp2);if(s.tp)s.tp=mp2(s.tp)})}})});q.ver=2;
   q.cur=Math.min(q.cur||0,q.pages.length-1);P=q;uid=d.uid||1}}}catch(e){}}
 async function open(){await restore();sel=null;pend=null;m.classList.add('on');setTool('sel');syncBar()}
 window.openGenkyoPhoto=open;
@@ -2749,11 +2812,9 @@ window.__pdfMake=async items=>{const pg=[];for(const it of items)pg.push({jpg:aw
 // 規制図(作図画面)をキャンバス化(「画像で表示」と同じ方法)
 function mainCanvas(){return new Promise((res,rej)=>{
  try{annEditEnd();draw(false)}catch(e){}
- const k=cv.width/S.W,x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+document.querySelector('#defs defs').outerHTML),im=new Image();
+ const k=cv.width/S.W,x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+document.querySelector('#defs defs').outerHTML);
  const back=()=>{try{draw()}catch(e){}};
- im.onload=()=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(cv,0,0);g.drawImage(im,0,0,c.width,c.height);back();res(c)};
- im.onerror=()=>{back();rej(new Error('規制図の画像化に失敗'))};
- im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x.replace('<svg','<svg width="'+S.W*k+'" height="'+S.H*k+'"'))})}
+ window.__svgImg(x.replace('<svg','<svg width="'+S.W*k+'" height="'+S.H*k+'"')).then(im=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(cv,0,0);g.drawImage(im,0,0,c.width,c.height);back();res(c)}).catch(()=>{back();rej(new Error('規制図の画像化に失敗'))})})}
 const mainReady=()=>!!(S.items.length||S.lines.length||S.pdfBytes||S.mapBg);
 // ---- ダイアログ
 const css=`#bpm{display:none;position:fixed;inset:0;z-index:30;background:#000a;align-items:center;justify-content:center;padding:14px}
