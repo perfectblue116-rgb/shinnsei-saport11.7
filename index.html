@@ -2641,7 +2641,7 @@ m.innerHTML=`<div id="phbar"><b>📷 現況写真</b>
 <span style="width:10px"></span><b>撮影方向</b><span class="small" id="phcf"></span>
 <select id="phdsel"><option value="">(選択して挿入)</option>${DIRS.map(d=>`<option>${d}</option>`).join('')}<option value="__none">(方角を消す)</option></select>
 <input type="text" id="phdir" placeholder="直接入力もできます" maxlength="30"><textarea id="phcm" rows="2" placeholder="コメント(撮影方向の横/下に表示・改行可)" style="width:280px;font-size:12px;vertical-align:middle"></textarea></div>
-<div id="phhint"></div><div id="phmain"><svg id="phsv" viewBox="0 0 ${W} ${H}" xmlns="${NS}"></svg><div id="phpr"></div></div><input type="file" id="phf" accept="image/*" hidden>`;
+<div id="phhint"></div><div id="phmain"><svg id="phsv" viewBox="0 0 ${W} ${H}" xmlns="${NS}"></svg><div id="phpr"></div></div><input type="file" id="phf" accept="image/*" style="position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0">`;
 document.body.appendChild(m);
 const sv=$('#phsv'),hint=$('#phhint');
 const HINT={sel:'図形をタップで選択→ドラッグで移動。○をドラッグで伸縮/頂点移動、緑の小○をドラッグで折れ点追加、文字もドラッグで移動。ダブルタップで多角形の折れ点追加/削除・寸法値編集。撮影方向の欄をタップで入力。',poly:'写真上を順にタップして頂点指定、ダブルタップ(または最初の点付近タップ)で確定。',dim:'写真上で2点をタップ→寸法値を入力(作図後は選択状態になり移動・伸縮・文字編集できます)。',text:'写真上をタップして文字を入力。',vadd:'多角形を選択し、辺をタップするとその位置に折れ点を追加します。',vdel:'多角形を選択し、折れ点をタップすると削除します(3点以上を維持)。'};
@@ -2710,6 +2710,9 @@ const pt=e=>{const r=sv.getBoundingClientRect();return[(e.clientX-r.left)/r.widt
 const frOf=p=>FRM().findIndex(f=>p[0]>=f.x&&p[0]<=f.x+f.w&&p[1]>=f.y&&p[1]<=f.y+f.h);
 const find=id=>{const fr=pg().fr;for(let i=0;i<fr.length;i++){const s=fr[i].sh.find(x=>x.id==id);if(s)return{s,i}}return null};
 function pickImg(i){pend=null;m._fi=i;$('#phf').value='';$('#phf').click()}
+// iPad/iOS Safari は pointerdown 内のファイル選択起動を無視するため、click(ユーザー操作)で開く
+function armPick(i){pend=null;m._pk=i}
+sv.addEventListener('click',()=>{if(m._pk!=null){const k=m._pk;m._pk=null;pickImg(k)}});
 $('#phf').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{
   // 長辺1600pxに縮小して保存容量を抑える
   const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
@@ -2722,7 +2725,7 @@ function polyAdd(s,p,tol){tol=tol||40;const n=s.p.length;let best=-1,bd=1e9,bq=n
 function polyDel(s,p,tol){tol=tol||40;if(s.p.length<=3)return false;let best=-1,bd=1e9;s.p.forEach((q,j)=>{const d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<bd){bd=d;best=j}});if(best<0||bd>tol)return false;s.p.splice(best,1);return true}
 const done=()=>{if(!$('#phlock').checked)setTool('sel');else draw()};
 sv.addEventListener('pointerdown',e=>{
- const p=pt(e),t=e.target,i=frOf(p),now=Date.now();
+ const p=pt(e),t=e.target,i=frOf(p),now=Date.now();m._pk=null;
  const dbl=(now-lastDn.t<380&&Math.hypot(p[0]-lastDn.x,p[1]-lastDn.y)<14);lastDn={t:now,x:p[0],y:p[1]};
  if(t.dataset&&t.dataset.title!=null){const v=prompt('見出し',P.title);if(v!=null){P.title=v;draw();persist()}return}
  const cap=t.closest&&t.closest('[data-dir]');
@@ -2744,9 +2747,9 @@ sv.addEventListener('pointerdown',e=>{
    else drag={r,p0:p,o:JSON.parse(JSON.stringify(r.s.p)),otp:r.s.tp?r.s.tp.slice():null};
    sv.setPointerCapture(e.pointerId);draw();syncBar();syncUI();return}
   sel=null;draw();syncUI();
-  if(i>=0&&!pg().fr[i].img){pickImg(i)}
+  if(i>=0&&!pg().fr[i].img){armPick(i)}
   return}
- if(i<0||!pg().fr[i].img){if(i>=0)pickImg(i);return}
+ if(i<0||!pg().fr[i].img){if(i>=0)armPick(i);return}
  const d=pg().fr[i];
  if(tool=='poly'){
   const now2=Date.now();
