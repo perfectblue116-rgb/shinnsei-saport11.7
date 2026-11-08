@@ -5,8 +5,8 @@
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="仮設計画">
-<title>仮設計画図作成ツール</title>
+<meta name="apple-mobile-web-app-title" content="諸官庁申請">
+<title>エステート専用 諸官庁申請サポートツール</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f5f7;--pn:#fff;--tx:#1d2330;--mu:#667085;--bd:#d5d9e0;--ac:#1f6feb;--ac2:#e8f0fe}
@@ -118,14 +118,29 @@ input[type=color]{width:38px;height:24px;padding:1px;cursor:pointer}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script>
 // SVG文字列→Image(BlobURL優先、失敗時dataURL)。巨大SVG・貼付画像入りでも画像化できるようにする
-window.__svgImg=function(x){
- x=String(x).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g,'');
- if(!/xmlns:xlink=/.test(x))x=x.replace('<svg','<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
- return new Promise(function(res,rej){
-  function tryUrl(url,rev,next){var im=new Image();im.onload=function(){if(rev)setTimeout(function(){URL.revokeObjectURL(url)},15000);res(im)};im.onerror=function(){if(rev)URL.revokeObjectURL(url);next()};im.src=url}
+window.__svgImg=function(x0){
+ var NSX='http://www.w3.org/1999/xlink',diag=[];
+ function clean(x){x=String(x).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g,'').replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/g,'').replace(/(^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/g,'$1').replace(/&nbsp;/g,'&#160;');
+  if(!/xmlns:xlink=/.test(x))x=x.replace('<svg','<svg xmlns:xlink="'+NSX+'"');return x}
+ function load(x){return new Promise(function(res,rej){
+  function tryUrl(url,rev,next){var im=new Image();im.onload=function(){if(rev)setTimeout(function(){URL.revokeObjectURL(url)},20000);res(im)};im.onerror=function(){if(rev)URL.revokeObjectURL(url);next()};im.src=url}
   var bu=null;try{bu=URL.createObjectURL(new Blob([x],{type:'image/svg+xml;charset=utf-8'}))}catch(e){}
-  var du=function(){tryUrl('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x),false,function(){rej(new Error('SVGの画像化に失敗'))})};
-  if(bu)tryUrl(bu,true,du);else du()})};
+  var du=function(){tryUrl('data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x),false,function(){rej(new Error('load'))})};
+  if(bu)tryUrl(bu,true,du);else du()})}
+ function xmlErr(x){try{var d=new DOMParser().parseFromString(x,'image/svg+xml'),pe=d.getElementsByTagName('parsererror');return pe.length?(pe[0].textContent||'').replace(/\s+/g,' ').slice(0,160):''}catch(e){return ''}}
+ function viaHtml(x){try{var d=document.createElement('div');d.innerHTML=x;var sv=d.querySelector('svg');return sv?new XMLSerializer().serializeToString(sv):x}catch(e){return x}}
+ function resize(x,f){return x.replace(/^(<svg[^>]*?)\swidth="([\d.]+)"([^>]*?)\sheight="([\d.]+)"/,function(m,a,w,b,h){return a+' width="'+Math.round(w*f)+'"'+b+' height="'+Math.round(h*f)+'"'})}
+ function strip(x,tag){return x.replace(new RegExp('<'+tag+'\\b[^>]*?(/>|>[\\s\\S]*?</'+tag+'>)','g'),'')}
+ var steps=[
+  function(){return clean(x0)},
+  function(){var x=clean(x0),e=xmlErr(x);if(e)diag.push('XML:'+e);return clean(viaHtml(x))},
+  function(){return resize(clean(viaHtml(x0)),.5)},
+  function(){return strip(clean(viaHtml(x0)),'image')},
+  function(){return resize(strip(strip(clean(viaHtml(x0)),'image'),'use'),.5)}];
+ return new Promise(function(res,rej){(function go(i){
+  if(i>=steps.length){rej(new Error('SVGの画像化に失敗'+(diag.length?'('+diag[0]+')':'')));return}
+  var x;try{x=steps[i]()}catch(e){go(i+1);return}
+  load(x).then(function(im){if(i>=3)window.__svgImgNote='貼付画像や一部図形を除いて出力しました';res(im)},function(){go(i+1)})})(0)})};
 </script>
 <script>
 // ★ Firebaseコンソール「プロジェクトの設定」→ マイアプリ(Web)の firebaseConfig を貼り付け
@@ -151,7 +166,7 @@ setInterval(chk,300000);document.addEventListener('visibilitychange',()=>{if(!do
 
 <div id="app">
 <aside>
-<h1>仮設計画図作成ツール</h1>
+<h1>エステート専用 諸官庁申請サポートツール</h1>
 <div id="siteBox"><div class="row"><b>現場</b><select id="siteSel" style="flex:1;min-width:0"></select></div><div class="row"><button id="siteNew" title="新しい現場を登録">＋新規</button><button id="siteSave" title="今の内容を保存">💾保存</button><button id="siteRen">名前変更</button><button id="siteDup">複製</button><button id="siteDel">削除</button></div><div class="row"><button id="siteExp" title="現場データをファイルに書き出し">書出</button><button id="siteImp" title="書き出したファイルを読込">読込</button><input type="file" id="siteImpF" accept=".json,application/json" hidden><span id="siteSt" class="small" style="margin-left:auto"></span></div></div>
 <details class="sec" data-k="road" open><summary>道路使用許可 図面</summary><div class="sb">
 <div class="row"><button id="rdOpenP" style="width:100%;font-weight:700">📍 位置図(付近見取図)を作成</button></div>
@@ -893,8 +908,11 @@ $('#trkGo').onclick=()=>{if(S.mode=='trk')trkEnd();else{if(!it.tr)it.tr={pts:[]}
 if(has){$('#trkUndo').onclick=()=>{it.tr.pts.pop();draw();props()};$('#trkClr').onclick=()=>{it.tr=null;draw();props()};
 $('#trkNext').onclick=()=>{const r=trkSim(it),e=r.st[r.st.length-1],hl=it.l/2/S.mpp,c=JSON.parse(JSON.stringify(it));c.id=S.uid++;c.tr=null;c.x=e.F.x+e.ux*(r.P.fo/S.mpp-hl);c.y=e.F.y+e.uy*(r.P.fo/S.mpp-hl);c.a=Math.round((((Math.atan2(-e.uy,-e.ux)*180/Math.PI)%360)+360)%360*10)/10;S.items.push(c);S.sel=c.id;draw();props()}}}
 // ---- 出力
-$('#prt').onclick=()=>{annEditEnd();S.sel=null;draw();window.print()};
-$('#png').onclick=()=>{annEditEnd();draw(false);const x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+$('#defs defs').outerHTML),k=cv.width/S.W;
+$('#prt').onclick=()=>{annEditEnd();S.sel=null;draw();
+ const wm=(S.W*25.4/72).toFixed(2),hm=(S.H*25.4/72).toFixed(2);let ps=document.getElementById('prtpg');if(!ps){ps=document.createElement('style');ps.id='prtpg';document.head.appendChild(ps)}
+ ps.textContent='@page{size:'+wm+'mm '+hm+'mm;margin:0}@media print{html,body{margin:0!important;padding:0!important;width:'+wm+'mm!important;height:'+hm+'mm!important;overflow:hidden!important}#app,#main,#wrap{display:block!important;position:static!important;overflow:visible!important;width:'+wm+'mm!important;height:'+hm+'mm!important}#stage{width:'+wm+'mm!important;height:'+hm+'mm!important;margin:0!important;box-shadow:none!important;page-break-after:avoid;break-after:avoid}}';
+ const clean=()=>{ps.textContent='';window.removeEventListener('afterprint',clean)};window.addEventListener('afterprint',clean);setTimeout(()=>window.print(),50)};
+$('#png').onclick=()=>{annEditEnd();draw(false);const x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+new XMLSerializer().serializeToString($('#defs defs'))),k=cv.width/S.W;
 window.__svgImg(x.replace('<svg','<svg width="'+S.W*k+'" height="'+S.H*k+'"')).then(im=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(cv,0,0);g.drawImage(im,0,0,c.width,c.height);
 try{$('#out').src=c.toDataURL('image/png')}catch(e){alert('出力に失敗しました')}$('#modal').style.display='block';draw()}).catch(()=>{alert('画像化に失敗しました');draw()})};
 $('#clr').onclick=()=>{S.items=[];S.lines=[];S.cl=null;S.cs=[];S.cv=null;S.sel=null;draw();props()};
@@ -2812,9 +2830,9 @@ window.__pdfMake=async items=>{const pg=[];for(const it of items)pg.push({jpg:aw
 // 規制図(作図画面)をキャンバス化(「画像で表示」と同じ方法)
 function mainCanvas(){return new Promise((res,rej)=>{
  try{annEditEnd();draw(false)}catch(e){}
- const k=cv.width/S.W,x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+document.querySelector('#defs defs').outerHTML);
+ const k=cv.width/S.W,x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+new XMLSerializer().serializeToString(document.querySelector('#defs defs')));
  const back=()=>{try{draw()}catch(e){}};
- window.__svgImg(x.replace('<svg','<svg width="'+S.W*k+'" height="'+S.H*k+'"')).then(im=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(cv,0,0);g.drawImage(im,0,0,c.width,c.height);back();res(c)}).catch(()=>{back();rej(new Error('規制図の画像化に失敗'))})})}
+ window.__svgImg(x.replace('<svg','<svg width="'+S.W*k+'" height="'+S.H*k+'"')).then(im=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(cv,0,0);g.drawImage(im,0,0,c.width,c.height);back();res(c)}).catch(er=>{back();rej(new Error('規制図の画像化に失敗'+(er&&er.message&&er.message!='SVGの画像化に失敗'?':'+er.message:(er&&er.message?er.message.replace('SVGの画像化に失敗',''):''))))})})}
 const mainReady=()=>!!(S.items.length||S.lines.length||S.pdfBytes||S.mapBg);
 // ---- ダイアログ
 const css=`#bpm{display:none;position:fixed;inset:0;z-index:30;background:#000a;align-items:center;justify-content:center;padding:14px}
@@ -2831,7 +2849,7 @@ box.innerHTML=`<div id="bpc"><h3>📑 一括PDF出力</h3><div class="small">チ
 <div class="bpr"><input type="checkbox" id="bpR"><label for="bpR"><b>② 規制図(道路使用図・作図画面)</b><span id="bpRs"></span></label></div>
 <div class="bpr"><input type="checkbox" id="bpH"><label for="bpH"><b>③ 現況写真(全ページ)</b><span id="bpHs"></span></label></div>
 <div class="bpf"><span class="small">ファイル名</span><input type="text" id="bpn"></div>
-<div id="bpst"></div><div class="bpb"><button id="bpx">閉じる</button><button id="bpgo">PDFを作成</button></div></div>`;
+<div id="bpst"></div><div class="bpb"><button id="bpx">閉じる</button><button id="bppr">🖨 印刷</button><button id="bpgo">PDFを作成</button></div></div>`;
 document.body.appendChild(box);
 const say=(t,c)=>{const e=q('#bpst');e.textContent=t||'';e.className=c||''};
 function setS(id,t,ok){const e=q(id);e.textContent=t;e.className=ok?'ok':'no'}
@@ -2849,22 +2867,38 @@ window.openBatchPdf=openBatch;
 q('#bpx').onclick=()=>box.classList.remove('on');
 box.addEventListener('pointerdown',e=>{if(e.target===box)box.classList.remove('on')});
 let busy=false;
+async function collect(){
+ const wantP=q('#bpP').checked,wantR=q('#bpR').checked,wantH=q('#bpH').checked,items=[];
+ if(!wantP&&!wantR&&!wantH)throw new Error('出力する書類にチェックを入れてください。');
+ window.__svgImgNote='';
+ if(wantP){say('位置図を作成中…');const c=window.rdSheetCanvas&&window.rdSheetCanvas();if(c)items.push({c,pw:595.28,ph:841.89})}
+ if(wantR){say('規制図を作成中…');const c=await mainCanvas();items.push({c,pw:S.W,ph:S.H})}
+ if(wantH){say('現況写真を作成中…');const cs=await window.genkyoPhotoCanvases(2);cs.forEach(c=>items.push({c,pw:595.28,ph:841.89}))}
+ if(!items.length)throw new Error('出力できるページがありません');
+ return items}
 q('#bpgo').onclick=async()=>{
- if(busy)return;
- const wantP=q('#bpP').checked,wantR=q('#bpR').checked,wantH=q('#bpH').checked;
- if(!wantP&&!wantR&&!wantH){say('出力する書類にチェックを入れてください。','err');return}
- busy=true;q('#bpgo').disabled=true;const items=[];
- try{
-  if(wantP){say('位置図を作成中…');const c=window.rdSheetCanvas&&window.rdSheetCanvas();if(c)items.push({c,pw:595.28,ph:841.89})}
-  if(wantR){say('規制図を作成中…');const c=await mainCanvas();items.push({c,pw:S.W,ph:S.H})}
-  if(wantH){say('現況写真を作成中…');const cs=await window.genkyoPhotoCanvases(2);cs.forEach(c=>items.push({c,pw:595.28,ph:841.89}))}
-  if(!items.length)throw new Error('出力できるページがありません');
+ if(busy)return;busy=true;q('#bpgo').disabled=true;q('#bppr').disabled=true;
+ try{const items=await collect();
   say('PDFにまとめています…('+items.length+'ページ)');
   const b=await window.__pdfMake(items);
   let nm=(q('#bpn').value||'').trim()||('申請書類_'+ymd()+'.pdf');if(!/\.pdf$/i.test(nm))nm+='.pdf';
-  window.__dlBlob(b,nm);say('PDFを出力しました('+items.length+'ページ / '+(b.size/1048576).toFixed(1)+'MB)。','ok')
+  window.__dlBlob(b,nm);say('PDFを出力しました('+items.length+'ページ / '+(b.size/1048576).toFixed(1)+'MB)。'+(window.__svgImgNote||''),'ok')
  }catch(e){say('出力に失敗しました:'+(e.message||e),'err')}
- busy=false;q('#bpgo').disabled=false};
+ busy=false;q('#bpgo').disabled=false;q('#bppr').disabled=false};
+q('#bppr').onclick=async()=>{
+ if(busy)return;busy=true;q('#bpgo').disabled=true;q('#bppr').disabled=true;
+ try{const items=await collect();say('印刷用に整えています…');
+  const boxp=document.createElement('div');boxp.id='bpprint';let css='@media screen{#bpprint{display:none}}@media print{body.bpprt>*:not(#bpprint){display:none!important}html,body{margin:0!important;padding:0!important}#bpprint{display:block}.bpp{overflow:hidden;break-after:page;page-break-after:always}.bpp:last-child{break-after:auto;page-break-after:auto}.bpp img{width:100%;height:100%;display:block}}';
+  const ims=[];
+  items.forEach((it,k)=>{const wm=(it.pw*25.4/72).toFixed(2),hm=(it.ph*25.4/72).toFixed(2);css+='@page pg'+k+'{size:'+wm+'mm '+hm+'mm;margin:0}';
+   const d=document.createElement('div');d.className='bpp';d.style.cssText='page:pg'+k+';width:'+wm+'mm;height:'+hm+'mm';
+   const im=new Image();im.src=it.c.toDataURL('image/jpeg',.92);ims.push(im.decode?im.decode().catch(()=>{}):Promise.resolve());d.appendChild(im);boxp.appendChild(d)});
+  await Promise.all(ims);
+  const st=document.createElement('style');st.id='bpprs';st.textContent=css;document.head.appendChild(st);document.body.appendChild(boxp);document.body.classList.add('bpprt');
+  const clean=()=>{boxp.remove();st.remove();document.body.classList.remove('bpprt');window.removeEventListener('afterprint',clean)};
+  window.addEventListener('afterprint',clean);box.classList.remove('on');say('');setTimeout(()=>window.print(),80)
+ }catch(e){say('印刷の準備に失敗しました:'+(e.message||e),'err')}
+ busy=false;q('#bpgo').disabled=false;q('#bppr').disabled=false};
 // ---- ボタン設置(上部ツールバー「出力」・左パネル「出力・表示」)
 const prtQ=document.querySelector('#qbar [data-q="prt"]');
 if(prtQ){const b=document.createElement('button');b.id='bpdfQ';b.title='位置図・規制図・現況写真をまとめて1つのPDFに出力';b.textContent='📑 一括PDF';b.onclick=openBatch;prtQ.parentNode.appendChild(b)}
