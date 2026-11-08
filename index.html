@@ -1292,48 +1292,53 @@ function wSet(k,v){const c=cur();if(!c.ty)return;c.o[k]=v;if(c.it){draw();}windo
 #rdedit label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}#rdedit input[type=checkbox]{width:auto;padding:0}#rdedit button{height:30px;padding:0 11px;white-space:nowrap}
 #rdedit button.pri{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:700}#rdedit button.pri.on{background:#e11d1d;border-color:#e11d1d}
 #rdcv{touch-action:none}
+/* 位置図作成 上部ツールバー(コンパクト・グループ化) */
+#rdtop{display:flex;flex-direction:column;flex-wrap:nowrap;gap:5px;padding:5px 10px 6px;align-items:stretch}
+#rdtop .rdr1{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+#rdtop .rdttl{font-size:14px;font-weight:700;margin-right:4px}
+#rdtop .seg{gap:0}#rdtop .seg button{border-radius:0}#rdtop .seg button:first-child{border-radius:6px 0 0 6px}#rdtop .seg button:last-child{border-radius:0 6px 6px 0;margin-left:-1px}
+#rdtop .rdctx{display:flex;flex-wrap:wrap;gap:4px 0;align-items:stretch;border-top:1px solid var(--bd);padding-top:5px}
+#rdtop .rdgp{display:flex;flex-direction:column;gap:2px;padding:0 10px;border-left:1px solid var(--bd)}
+#rdtop .rdgp:first-child{padding-left:0;border-left:0}
+#rdtop .rdgp.end{margin-left:auto;border-left:0;padding-right:0}
+#rdtop .rdl{font-size:12px;font-weight:700;line-height:1.1;color:var(--tx);white-space:nowrap}
+#rdtop .rdb{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;min-height:28px}
+#rdtop button{height:28px;padding:0 9px}
+#rdtop select,#rdtop input#rdq,#rdtop input[type=number]{height:28px}
+#rdform,#rdedit{padding:4px 10px;gap:4px 12px}#rdedit button{height:28px}
 @media print{#rdm{display:none!important}}
 </style>
 <div id="rdm">
  <div id="rdtop">
-  <b>道路使用許可 図面作成</b>
-  <span class="rdg"><button id="rdtabP" class="tab">位置図(付近見取図)</button><button id="rdtabR" class="tab">道路使用図(規制図)の下図</button></span>
-  <span class="rdg" id="rdsrch"><input id="rdq" placeholder="住所・地名で検索"><button id="rdgo">検索</button></span>
-  <span class="rdg" id="rdp1">
-   <button id="rdpos" class="pri" title="地図上をドラッグして、詳細位置図に入れる範囲を囲みます">▭ エリアを選択して挿入</button>
-   <button id="rdsecB" title="地図上の2点をクリックして、道路を使用する区間を赤線で示します(任意)">区間を指定</button>
-   <button id="rdstmB" title="申請地を示す★を地図上に置きます(任意)">「申請地」スタンプを配置</button>
-   <button id="rdclrB">指定を消す</button>
-   <button id="rdpback">← 位置図に戻る</button>
-  </span>
-  <span class="rdg" id="rdv1">
-   <label title="線画の元データ。標準地図→線画変換=地理院の標準地図(歩道の線まで描かれた画像)を線画に自動変換します(推奨)。国土地理院(ベクトル)=基盤地図情報の道路縁・建物。取得できないときは順にベクトル→OpenStreetMapで自動作成します">データ<select id="rdsrc"><option value="img" selected>標準地図→線画変換(歩道つき)</option><option value="gsi">国土地理院(ベクトル)</option><option value="osm">OpenStreetMap</option></select></label>
-   <button id="rdsel" class="pri" title="地図上をドラッグして、PDF(A3横)に出力する範囲を囲みます">PDF出力範囲指定</button>
-   <label>縮尺<select id="rdsc"><option value="0">自由(囲んだ範囲に合わせる)</option><option value="100">1/100固定</option><option value="150">1/150固定</option><option value="200">1/200固定</option><option value="250">1/250固定</option><option value="300">1/300固定</option><option value="500">1/500固定</option><option value="1000">1/1000固定</option></select></label>
-  </span>
-  <span class="rdg" id="rdv2" hidden>
-   <label><input type="checkbox" id="rdoName" checked>施設名を表示</label>
-   <label title="Google Mapsの施設名を反映する場合のみ入力(Places API (New) のキー。ブラウザ内にのみ保存)">Google APIキ&#x30FC;<input type="password" id="rdGkey" style="width:110px" placeholder="任意"></label>
-   <label><input type="checkbox" id="rdoNorth" checked>方位を表示</label>
-   <label><input type="checkbox" id="rdoFill" checked>建物を塗る</label>
-   <label><input type="checkbox" id="rdoScale" checked>縮尺を表示</label>
-   <label><input type="checkbox" id="rdoRoad" checked>道路線</label>
-   <label title="歩道の帯を描きます。OSM情報=地図データに歩道の記載がある道路のみ。推定を含める=幹線道路(国道・県道・主要市道)は両側に歩道があるものとして描きます。【標準地図→線画変換のとき】「なし」以外は、標準地図にある歩道側の細い線をそのまま描きます">歩道<select id="rdoSw"><option value="gsi" selected>地理院+道路縁から推定</option><option value="est">OSM+推定</option><option value="osm">OSM情報のみ</option><option value="none">なし</option></select></label>
-   <label title="道路縁から道路中心側へ平行移動する距離(歩道幅)。道路の片側幅員(縁〜中心線)がこの値未満の細い道には歩道線を描きません">歩道幅<input type="number" id="rdoSwW" value="2.5" min="1" max="6" step="0.5" style="width:50px">m 対象<input type="number" id="rdoSwM" value="4" min="2" max="15" step="0.5" style="width:50px">m以上</label><label><input type="checkbox" id="rdoZb" checked>横断歩道</label><label title="横断歩道の縞を、道路の線(道路縁)からこの距離だけ内側で止めます。歩道側にはみ出す場合は大きく、短すぎる場合は小さくします(0で線まで)">歩道側の余白<input type="number" id="rdoZbM" value="1.5" min="0" max="8" step="0.5" style="width:50px">m</label>
-   <button id="rdzbA" title="OSMに横断歩道のデータが無い場所で使います。プレビュー上で、道路を横切る向きに2点(道路の一方の端→反対の端)をクリックすると、その線に沿って横断歩道を描きます。続けて何本でも追加できます(Escで終了)">横断歩道を追加</button><button id="rdzbC" title="手動で追加した横断歩道をすべて消します">追加分を消す</button>
-   <label title="道路幅が実際と違うときに、車道の幅をまとめて増減します">車道幅<input type="number" id="rdoRs" value="100" min="50" max="200" step="5" style="width:56px">%</label>
-   <label><input type="checkbox" id="rdoBld" checked>建物線</label>
-   <label><input type="checkbox" id="rdoAttr" checked>出典表示</label>
-   <button id="rdback">範囲を取り直す</button>
-   <button id="rdok" class="pri">作図画面に反映</button>
-  </span>
-  <span class="rdg" id="rdp2" hidden>
-   <button id="rdpick" class="pri" title="Googleマップを開いて、詳細位置図の範囲を選びます">🗺 詳細位置図を選ぶ(Googleマップ)</button>
-   <label>広域図<select id="rdwm"><option value="4">4倍</option><option value="6">6倍</option><option value="8">8倍</option><option value="12" selected>12倍</option><option value="16">16倍</option><option value="24">24倍</option></select></label>
-   <button id="rdfzi" title="赤枠(詳細位置図の範囲)を広げる。広域図の赤枠の四隅をドラッグしても変更できます">詳細範囲 ＋</button><button id="rdfzo" title="赤枠(詳細位置図の範囲)を狭める">詳細範囲 －</button>
-   <button id="rdjpg">JPGで出力</button><button id="rdpdf" class="pri">PDFで出力</button>
-  </span>
-  <button id="rdclose" style="margin-left:auto">閉じる</button>
+  <div class="rdr1">
+   <b class="rdttl">🗺 道路使用許可 図面作成</b>
+   <span class="rdg seg"><button id="rdtabP" class="tab">位置図(付近見取図)</button><button id="rdtabR" class="tab">道路使用図(規制図)の下図</button></span>
+   <span class="rdg" id="rdsrch"><input id="rdq" placeholder="住所・地名で検索"><button id="rdgo">検索</button></span>
+   <button id="rdclose" style="margin-left:auto">✕ 閉じる</button>
+  </div>
+  <div class="rdctx" id="rdp1">
+   <div class="rdgp"><span class="rdl">① 範囲</span><div class="rdb"><button id="rdpos" class="pri" title="地図上をドラッグして、詳細位置図に入れる範囲を囲みます">▭ エリアを選択して挿入</button></div></div>
+   <div class="rdgp"><span class="rdl">目印(任意)</span><div class="rdb"><button id="rdsecB" title="地図上の2点をクリックして、道路を使用する区間を赤線で示します(任意)">区間を指定</button><button id="rdstmB" title="申請地を示す★を地図上に置きます(任意)">「申請地」スタンプを配置</button></div></div>
+   <div class="rdgp"><span class="rdl">やり直し</span><div class="rdb"><button id="rdclrB">指定を消す</button><button id="rdpback">← 位置図に戻る</button></div></div>
+  </div>
+  <div class="rdctx" id="rdv1">
+   <div class="rdgp"><span class="rdl">① 地図データ</span><div class="rdb"><label title="線画の元データ。標準地図→線画変換=地理院の標準地図(歩道の線まで描かれた画像)を線画に自動変換します(推奨)。国土地理院(ベクトル)=基盤地図情報の道路縁・建物。取得できないときは順にベクトル→OpenStreetMapで自動作成します"><select id="rdsrc"><option value="img" selected>標準地図→線画変換(歩道つき)</option><option value="gsi">国土地理院(ベクトル)</option><option value="osm">OpenStreetMap</option></select></label></div></div>
+   <div class="rdgp"><span class="rdl">② 出力範囲</span><div class="rdb"><label>縮尺<select id="rdsc"><option value="0">自由(囲んだ範囲に合わせる)</option><option value="100">1/100固定</option><option value="150">1/150固定</option><option value="200">1/200固定</option><option value="250">1/250固定</option><option value="300">1/300固定</option><option value="500">1/500固定</option><option value="1000">1/1000固定</option></select></label><button id="rdsel" class="pri" title="地図上をドラッグして、PDF(A3横)に出力する範囲を囲みます">PDF出力範囲指定</button></div></div>
+  </div>
+  <div class="rdctx" id="rdv2" hidden>
+   <div class="rdgp"><span class="rdl">表示</span><div class="rdb"><label><input type="checkbox" id="rdoName" checked>施設名</label><label><input type="checkbox" id="rdoNorth" checked>方位</label><label><input type="checkbox" id="rdoScale" checked>縮尺</label><label><input type="checkbox" id="rdoAttr" checked>出典</label></div></div>
+   <div class="rdgp"><span class="rdl">線・塗り</span><div class="rdb"><label><input type="checkbox" id="rdoRoad" checked>道路線</label><label><input type="checkbox" id="rdoBld" checked>建物線</label><label><input type="checkbox" id="rdoFill" checked>建物を塗る</label></div></div>
+   <div class="rdgp"><span class="rdl">歩道</span><div class="rdb"><label title="歩道の帯を描きます。OSM情報=地図データに歩道の記載がある道路のみ。推定を含める=幹線道路(国道・県道・主要市道)は両側に歩道があるものとして描きます。【標準地図→線画変換のとき】「なし」以外は、標準地図にある歩道側の細い線をそのまま描きます"><select id="rdoSw"><option value="gsi" selected>地理院+道路縁から推定</option><option value="est">OSM+推定</option><option value="osm">OSM情報のみ</option><option value="none">なし</option></select></label><label title="道路縁から道路中心側へ平行移動する距離(歩道幅)。道路の片側幅員(縁〜中心線)がこの値未満の細い道には歩道線を描きません">幅<input type="number" id="rdoSwW" value="2.5" min="1" max="6" step="0.5" style="width:50px">m 対象<input type="number" id="rdoSwM" value="4" min="2" max="15" step="0.5" style="width:50px">m以上</label></div></div>
+   <div class="rdgp"><span class="rdl">横断歩道</span><div class="rdb"><label><input type="checkbox" id="rdoZb" checked>表示</label><label title="横断歩道の縞を、道路の線(道路縁)からこの距離だけ内側で止めます。歩道側にはみ出す場合は大きく、短すぎる場合は小さくします(0で線まで)">余白<input type="number" id="rdoZbM" value="1.5" min="0" max="8" step="0.5" style="width:50px">m</label><button id="rdzbA" title="OSMに横断歩道のデータが無い場所で使います。プレビュー上で、道路を横切る向きに2点(道路の一方の端→反対の端)をクリックすると、その線に沿って横断歩道を描きます。続けて何本でも追加できます(Escで終了)">＋追加</button><button id="rdzbC" title="手動で追加した横断歩道をすべて消します">追加分を消す</button></div></div>
+   <div class="rdgp"><span class="rdl">車道</span><div class="rdb"><label title="道路幅が実際と違うときに、車道の幅をまとめて増減します">幅<input type="number" id="rdoRs" value="100" min="50" max="200" step="5" style="width:56px">%</label></div></div>
+   <div class="rdgp"><span class="rdl">Google連携(任意)</span><div class="rdb"><label title="Google Mapsの施設名を反映する場合のみ入力(Places API (New) のキー。ブラウザ内にのみ保存)">APIキー<input type="password" id="rdGkey" style="width:100px" placeholder="任意"></label></div></div>
+   <div class="rdgp end"><span class="rdl">確定</span><div class="rdb"><button id="rdback">範囲を取り直す</button><button id="rdok" class="pri">作図画面に反映</button></div></div>
+  </div>
+  <div class="rdctx" id="rdp2" hidden>
+   <div class="rdgp"><span class="rdl">① 詳細位置図</span><div class="rdb"><button id="rdpick" class="pri" title="Googleマップを開いて、詳細位置図の範囲を選びます">🗺 詳細位置図を選ぶ(Googleマップ)</button></div></div>
+   <div class="rdgp"><span class="rdl">② 範囲の調整</span><div class="rdb"><label>広域図<select id="rdwm"><option value="4">4倍</option><option value="6">6倍</option><option value="8">8倍</option><option value="12" selected>12倍</option><option value="16">16倍</option><option value="24">24倍</option></select></label><button id="rdfzi" title="赤枠(詳細位置図の範囲)を広げる。広域図の赤枠の四隅をドラッグしても変更できます">詳細範囲 ＋</button><button id="rdfzo" title="赤枠(詳細位置図の範囲)を狭める">詳細範囲 －</button></div></div>
+   <div class="rdgp end"><span class="rdl">③ 出力</span><div class="rdb"><button id="rdjpg">JPGで出力</button><button id="rdpdf" class="pri">PDFで出力</button></div></div>
+  </div>
  </div>
  <div id="rdform" hidden>
   <label><input type="checkbox" id="rfT" checked>図面タイトル</label><input id="rfTv" value="● 位置図" style="width:230px">
@@ -2402,21 +2407,28 @@ const gBB=it=>{const xs=it.pts.map(p=>p.x),ys=it.pts.map(p=>p.y);return{x0:Math.
 const gTP=it=>{if(it.tp)return it.tp;const b=gBB(it);return{x:(b.x0+b.x1)/2,y:(b.y0+b.y1)/2}};
 const gTxt=(it,hit)=>{if(!it.txt)return'';if(!it.t25){it.t25=1;if((it.tfs||14)==14)it.tfs=35}const t=gTP(it),fs=it.tfs||13,ls=String(it.txt).split('\n'),y0=t.y-(ls.length-1)*fs*.6;
  return`<text x="${t.x}" y="${y0}" font-size="${fs}" font-weight="${it.tbo===false?400:700}" fill="${hit?'transparent':it.tc||'#111'}" text-anchor="middle" dominant-baseline="central" pointer-events="${hit?'all':'none'}" style="${hit?'cursor:move':`paint-order:stroke;stroke:${isLight(it.tc||'#111')?'#333':'#fff'};stroke-width:${fs/8}px;stroke-linejoin:round`}">`+ls.map((l,i)=>`<tspan x="${t.x}" y="${y0+i*fs*1.2}">${esc(l)}</tspan>`).join('')+'</text>'};
-const dimBase=(a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1,n={x:dy/L,y:-dx/L},pf=Math.abs(dx)>=Math.abs(dy)?{x:0,y:-1}:{x:-1,y:0};return{k:'g',ty:'dim',name:'寸法線',x:0,y:0,pts:[{x:a.x,y:a.y},{x:b.x,y:b.y}],txt:'1,000',tfs:13,tbo:true,col:'#111111',lw:2,e1:10,e2:60,sd:(n.x*pf.x+n.y*pf.y)>0?-1:1}};
+const dimBase=(a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1,n={x:dy/L,y:-dx/L},pf=Math.abs(dx)>=Math.abs(dy)?{x:0,y:-1}:{x:-1,y:0};return{k:'g',ty:'dim',name:'寸法線',x:0,y:0,pts:[{x:a.x,y:a.y},{x:b.x,y:b.y}],txt:'1,000',tfs:13,tbo:true,col:'#111111',lw:.5,e1:16,e2:60,sd:(n.x*pf.x+n.y*pf.y)>0?-1:1}};
 const mkDim=(a,b)=>({...dimBase(a,b),id:S.uid++});
 const hvSn=(p,o,tol=10)=>{const dx=p.x-o.x,dy=p.y-o.y;if(Math.hypot(dx,dy)<1e-6)return p;const g=Math.abs(Math.atan2(dy,dx)*180/Math.PI);if(g<tol||g>180-tol)return{x:p.x,y:o.y};if(Math.abs(g-90)<tol)return{x:o.x,y:p.y};return p};
-const dimSvg=(it,on)=>{const a=it.pts[0],b=it.pts[1],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1,u={x:dx/L,y:dy/L},n={x:u.y,y:-u.x},lw=it.lw||2,col=it.col||'#111',sd=it.sd||1,e1=it.e1==null?10:it.e1,e2=it.e2==null?60:it.e2,
+const dimTxt=it=>{const a=it.pts[0],b=it.pts[1],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1,sd=it.sd||1,nx=dy/L*sd,ny=-dx/L*sd,lw=it.lw==null?.5:it.lw,fs=it.tfs||13,off=fs*.62+lw/2+4;let deg=Math.atan2(dy,dx)*180/Math.PI;while(deg>=90)deg-=180;while(deg<-90)deg+=180;
+ const p=it.tp||{x:(a.x+b.x)/2-nx*off,y:(a.y+b.y)/2-ny*off};return{x:p.x,y:p.y,deg,fs,nx,ny}};
+const dimSvg=(it,on)=>{const a=it.pts[0],b=it.pts[1],dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1,u={x:dx/L,y:dy/L},n={x:u.y,y:-u.x},lw=it.lw==null?.5:it.lw,col=it.col||'#111',sd=it.sd||1,e1=it.e1==null?16:it.e1,e2=it.e2==null?60:it.e2,
  hl=Math.min(Math.max(12,lw*4+6),L/2.5),hw=hl*.42,fs=it.tfs||13,P=(q,k,m)=>`${N(q.x+k.x*m)} ${N(q.y+k.y*m)}`,nd={x:n.x*sd,y:n.y*sd};
  const tk=q=>`M${P(q,nd,e2)}L${P(q,nd,-e1)}`,head=(q,v)=>{const bx={x:q.x+v.x*hl,y:q.y+v.y*hl};return`M${N(q.x)} ${N(q.y)}L${P(bx,n,hw)}L${P(bx,n,-hw)}Z`};
  const d=`M${N(a.x)} ${N(a.y)}L${N(b.x)} ${N(b.y)}`,tkd=tk(a)+tk(b);
- let deg=Math.atan2(dy,dx)*180/Math.PI;while(deg>=90)deg-=180;while(deg<-90)deg+=180;const off=fs*.62+lw/2+4,tx=(a.x+b.x)/2-nd.x*off,ty=(a.y+b.y)/2-nd.y*off;
+ const T=dimTxt(it),deg=T.deg,tx=T.x,ty=T.y;
  return`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y})">`+(on?`<path d="${d}${tkd}" fill="none" stroke="#f59e0b" stroke-width="${lw+6}" stroke-opacity=".3" stroke-linecap="round" pointer-events="none"/>`:'')
  +`<path d="${d}${tkd}" fill="none" stroke="transparent" stroke-width="${Math.max(12,lw+8)}" pointer-events="stroke"/>`
  +`<path d="${tkd}" fill="none" stroke="${col}" stroke-width="${lw}" pointer-events="none"/><path d="${d}" fill="none" stroke="${col}" stroke-width="${lw}" pointer-events="none"/><path d="${head(a,u)}${head(b,{x:-u.x,y:-u.y})}" fill="${col}" stroke="${col}" stroke-width="${lw*.3}" stroke-linejoin="round" pointer-events="none"/>`
  +(it.txt?`<text transform="translate(${N(tx)} ${N(ty)}) rotate(${N(deg)})" font-size="${fs}" font-weight="${it.tbo===false?400:700}" fill="${col}" text-anchor="middle" dominant-baseline="central" pointer-events="all" style="user-select:none;paint-order:stroke;stroke:#fff;stroke-width:${Math.max(2,fs/6)}px;stroke-linejoin:round">${esc(it.txt)}</text>`:'')+'</g>'};
 window.gSvg=function(it,on){if(it.ty=='sig')return sigSvg(it,on);if(it.ty=='dim')return dimSvg(it,on);if(!it.pts||it.pts.length<2)return'';const d='M'+it.pts.map(p=>N(p.x)+' '+N(p.y)).join('L')+'Z',f=it.fill;
  return`<g class="it" data-id="${it.id}" transform="translate(${it.x} ${it.y})">`+(on?`<path d="${d}" fill="none" stroke="#f59e0b" stroke-width="${it.lw+6}" stroke-opacity=".3" stroke-linejoin="round" pointer-events="none"/>`:'')+(f?`<path d="${d}" fill="${it.fc}" fill-opacity="${it.fo}" stroke="none"/>`:'')+`<path d="${d}" fill="${f?'transparent':'none'}" stroke="transparent" stroke-width="${Math.max(10,it.lw+8)}" pointer-events="${f?'all':'stroke'}"/>`+(it.bd?`<path d="${d}" fill="none" stroke="${it.sc}" stroke-width="${it.lw}" stroke-linejoin="round" pointer-events="none"/>`:'')+gTxt(it)+'</g>'};
-window.gHdl=function(it){if(it.ty=='dim'){const zz=z(),hr=(matchMedia('(pointer:coarse)').matches?14:9)/zz;return`<g data-id="${it.id}" transform="translate(${it.x} ${it.y})">`+it.pts.map((p,i)=>`<g data-h="gvd${i}" style="cursor:move"><circle cx="${p.x}" cy="${p.y}" r="${hr}" fill="transparent"/><circle cx="${p.x}" cy="${p.y}" r="${3.4/zz}" fill="#fff" stroke="#f59e0b" stroke-width="${1.4/zz}"/></g>`).join('')+'</g>'}
+window.gHdl=function(it){if(it.ty=='dim'){const zz=z(),hr=(matchMedia('(pointer:coarse)').matches?14:9)/zz,hr2=7/zz,T=dimTxt(it),e1=it.e1==null?16:it.e1,e2=it.e2==null?60:it.e2,dot=(x,y,h,r,cu,fill)=>`<g data-h="${h}" style="cursor:${cu}"><circle cx="${x}" cy="${y}" r="${r}" fill="transparent"/><circle cx="${x}" cy="${y}" r="${3.4/zz}" fill="${fill||'#fff'}" stroke="#f59e0b" stroke-width="${1.4/zz}"/></g>`;
+  let o=`<g data-id="${it.id}" transform="translate(${it.x} ${it.y})">`;
+  if(it.txt){const w=[...String(it.txt)].reduce((s,c)=>s+(c.charCodeAt(0)>255?T.fs:T.fs*.6),0)+8,h=T.fs+8;o+=`<g data-h="gvdt" style="cursor:move" transform="translate(${T.x} ${T.y}) rotate(${T.deg})"><rect x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" fill="#2563eb" fill-opacity=".06" stroke="#2563eb" stroke-width="${1/zz}" stroke-dasharray="${3/zz} ${2/zz}"/></g>`}
+  it.pts.forEach((p,i)=>{const dx=it.pts[1].x-it.pts[0].x,dy=it.pts[1].y-it.pts[0].y,L=Math.hypot(dx,dy)||1,sd=it.sd||1,nx=dy/L*sd,ny=-dx/L*sd;
+   o+=dot(p.x+nx*e2,p.y+ny*e2,'gvdf'+i,hr2,'ns-resize','#f59e0b')+dot(p.x-nx*e1,p.y-ny*e1,'gvdn'+i,hr2,'ns-resize','#f59e0b')});
+  return o+it.pts.map((p,i)=>dot(p.x,p.y,'gvd'+i,hr2,'move')).join('')+'</g>'}
  if(it.ty=='sig'){const zz=z(),w=it.w,h=w*314/846,hr=(matchMedia('(pointer:coarse)').matches?14:9)/zz,ry=-h/2-22/zz;let o=`<g data-id="${it.id}" transform="translate(${it.x} ${it.y}) rotate(${it.a||0})">`;
   for(const[hx,hy,cu]of[[-1,-1,'nwse-resize'],[1,-1,'nesw-resize'],[1,1,'nwse-resize'],[-1,1,'nesw-resize']])o+=`<g data-h="gvs${hx},${hy}" style="cursor:${cu}"><circle cx="${hx*w/2}" cy="${hy*h/2}" r="${hr}" fill="transparent"/><circle cx="${hx*w/2}" cy="${hy*h/2}" r="${3.4/zz}" fill="#fff" stroke="#f59e0b" stroke-width="${1.4/zz}"/></g>`;
   return o+`<line x1="0" y1="${-h/2}" x2="0" y2="${ry}" stroke="#f59e0b" stroke-width="${1/zz}" pointer-events="none"/><g data-h="gvr" style="cursor:grab"><circle cx="0" cy="${ry}" r="${hr}" fill="transparent"/><circle cx="0" cy="${ry}" r="${4.4/zz}" fill="#f59e0b" stroke="#fff" stroke-width="${1.2/zz}"/></g></g>`}
@@ -2426,6 +2438,9 @@ window.gHdl=function(it){if(it.ty=='dim'){const zz=z(),hr=(matchMedia('(pointer:
  const mids=it.pts.map((p,i)=>{const c=it.pts[(i+1)%it.pts.length],mx=(p.x+c.x)/2,my=(p.y+c.y)/2;return`<g data-h="gvm${i}" style="cursor:copy"><circle cx="${mx}" cy="${my}" r="${hr*.8}" fill="transparent"/><circle cx="${mx}" cy="${my}" r="${2.6/zz}" fill="#f59e0b" fill-opacity=".35" stroke="#f59e0b" stroke-width="${1/zz}"/></g>`}).join('');
  return o+mids+it.pts.map((p,i)=>`<g data-h="gv${i}" style="cursor:move"><circle cx="${p.x}" cy="${p.y}" r="${hr}" fill="transparent"/><circle cx="${p.x}" cy="${p.y}" r="${3.4/zz}" fill="#fff" stroke="#f59e0b" stroke-width="${1.4/zz}"/></g>`).join('')+'</g>'};
 window.gDrag=function(it,d,p){const lx=p.x-it.x,ly=p.y-it.y;
+ if(it.ty=='dim'&&d.h=='gvdt'){it.tp={x:lx,y:ly};return}
+ if(it.ty=='dim'&&/^gvd[fn]/.test(d.h)){const i=+d.h.slice(4),a=it.pts[i],b=it.pts[1-i],dx=it.pts[1].x-it.pts[0].x,dy=it.pts[1].y-it.pts[0].y,L=Math.hypot(dx,dy)||1,sd=it.sd||1,nx=dy/L*sd,ny=-dx/L*sd,pj=(lx-a.x)*nx+(ly-a.y)*ny;
+  if(d.h[3]=='f'){it.e2=Math.max(0,Math.round(pj));const e=document.querySelector('#g_de2');if(e)e.value=it.e2}else{it.e1=Math.max(0,Math.round(-pj));const e=document.querySelector('#g_de1');if(e)e.value=it.e1}return}
  if(it.ty=='dim'&&d.h.startsWith('gvd')){const i=+d.h.slice(3),o=it.pts[1-i];if(o)it.pts[i]=hvSn({x:lx,y:ly},o);return}
  if(it.ty=='sig'){const a=(it.a||0)*Math.PI/180,c=Math.cos(a),n=Math.sin(a),rx=lx*c+ly*n,ry=-lx*n+ly*c;
   if(d.h=='gvr'){let g=Math.atan2(ly,lx)*180/Math.PI+90;g=((g%360)+360)%360;if(d.sh)g=Math.round(g/15)*15%360;else{const t=Math.round(g/90)*90;if(Math.abs(g-t)<3)g=t%360}it.a=Math.round(g*10)/10;return}
@@ -2441,11 +2456,11 @@ window.gDrag=function(it,d,p){const lx=p.x-it.x,ly=p.y-it.y;
 // ---- プロパティ
 window.gProps=function(it,P){const q=s=>P.querySelector(s),dupb='<div class="row"><button id="g_dup">複製</button><button id="g_del">削除</button></div>';
  if(it.ty=='sig'){P.innerHTML=`<b>信号</b><div class="row">大きさ(幅)<input id="g_w" type="number" min="8" step="2" value="${Math.round(it.w)}"><button id="g_r">⟳90°</button></div>`+dupb;q('#g_w').onchange=e=>{it.w=Math.max(8,+e.target.value||it.w);draw()};q('#g_r').onclick=()=>{it.a=((it.a||0)+90)%360;draw()}}
- else if(it.ty=='dim'){P.innerHTML=`<b>寸法線</b><div class="row">寸法<input id="g_dtx" type="text" value="${esc(it.txt||'')}" style="width:110px"><button id="g_dau" title="現在の長さを縮尺から計算して入力">長さから自動入力</button></div><div class="row">文字<input id="g_dfs" type="number" min="4" max="300" value="${it.tfs||13}" style="width:52px"><label><input type="checkbox" id="g_dbo" ${it.tbo!==false?'checked':''}>太字</label><input type="color" id="g_dc" value="${it.col||'#111111'}">線<input id="g_dlw" type="number" min="0.5" max="12" step="0.5" value="${it.lw||2}" style="width:52px"></div><div class="row">端線の長さ 長側<input id="g_de2" type="number" min="0" step="5" value="${it.e2}" style="width:56px">短側<input id="g_de1" type="number" min="0" step="5" value="${it.e1}" style="width:56px"></div><div class="row"><button id="g_dfl">⇄ 文字側を反転</button></div><div class="small">端点の○をドラッグで伸縮(水平・垂直に自動吸着)／本体ドラッグで移動／ダブルクリックで寸法を入力。寸法の数値は自由に入力できます。</div>`+dupb;
+ else if(it.ty=='dim'){P.innerHTML=`<b>寸法線</b><div class="row">寸法<input id="g_dtx" type="text" value="${esc(it.txt||'')}" style="width:110px"><button id="g_dau" title="現在の長さを縮尺から計算して入力">長さから自動入力</button></div><div class="row">文字<input id="g_dfs" type="number" min="4" max="300" value="${it.tfs||13}" style="width:52px"><label><input type="checkbox" id="g_dbo" ${it.tbo!==false?'checked':''}>太字</label><input type="color" id="g_dc" value="${it.col||'#111111'}">線<input id="g_dlw" type="number" min="0.5" max="12" step="0.5" value="${it.lw==null?.5:it.lw}" style="width:52px"></div><div class="row">端線の長さ 長側<input id="g_de2" type="number" min="0" step="5" value="${it.e2}" style="width:56px">短側<input id="g_de1" type="number" min="0" step="5" value="${it.e1}" style="width:56px"></div><div class="row"><button id="g_dfl">⇄ 文字側を反転</button><button id="g_dtr">文字位置リセット</button></div><div class="small">端点の○:ドラッグで伸縮(水平・垂直に自動吸着)／端線の先の○:ドラッグで端線を伸縮／点線枠の文字:ドラッグで自由に移動／本体ドラッグで移動／ダブルクリックで寸法を入力。</div>`+dupb;
   q('#g_dtx').addEventListener('keydown',e=>e.stopPropagation());q('#g_dtx').oninput=e=>{it.txt=e.target.value;drawRaf()};
   q('#g_dau').onclick=()=>{const L=Math.hypot(it.pts[1].x-it.pts[0].x,it.pts[1].y-it.pts[0].y);it.txt=Math.round(L*S.mpp*1000).toLocaleString('en-US');q('#g_dtx').value=it.txt;draw()};
-  q('#g_dfs').onchange=e=>{it.tfs=Math.max(4,Math.min(300,+e.target.value||13));draw()};q('#g_dbo').onchange=e=>{it.tbo=e.target.checked;draw()};q('#g_dc').oninput=e=>{it.col=e.target.value;draw()};q('#g_dlw').onchange=e=>{it.lw=Math.max(.5,+e.target.value||2);draw()};
-  q('#g_de2').onchange=e=>{it.e2=Math.max(0,+e.target.value||0);draw()};q('#g_de1').onchange=e=>{it.e1=Math.max(0,+e.target.value||0);draw()};q('#g_dfl').onclick=()=>{it.sd=-(it.sd||1);draw()};
+  q('#g_dfs').onchange=e=>{it.tfs=Math.max(4,Math.min(300,+e.target.value||13));draw()};q('#g_dbo').onchange=e=>{it.tbo=e.target.checked;draw()};q('#g_dc').oninput=e=>{it.col=e.target.value;draw()};q('#g_dlw').onchange=e=>{it.lw=Math.max(.5,+e.target.value||.5);draw()};
+  q('#g_de2').onchange=e=>{it.e2=Math.max(0,+e.target.value||0);draw()};q('#g_de1').onchange=e=>{it.e1=Math.max(0,+e.target.value||0);draw()};q('#g_dfl').onclick=()=>{it.sd=-(it.sd||1);it.tp=null;draw()};q('#g_dtr').onclick=()=>{it.tp=null;draw()};
   ['#g_dfs','#g_dlw','#g_de2','#g_de1'].forEach(k=>q(k).addEventListener('keydown',e=>e.stopPropagation()))}
  else{P.innerHTML=`<b>${it.name}</b><div class="row"><label><input type="checkbox" id="g_fill" ${it.fill?'checked':''}>塗りつぶし</label><input type="color" id="g_fc" value="${it.fc}"></div><div class="row">透過<input id="g_tr" type="range" min="0" max="100" value="${Math.round((1-it.fo)*100)}" style="width:110px"><span id="g_trv" class="small">${Math.round((1-it.fo)*100)}%</span></div><div class="row"><label><input type="checkbox" id="g_bd" ${it.bd?'checked':''}>枠線</label><input type="color" id="g_sc" value="${it.sc}">太さ<input id="g_lw" type="number" min="0.5" max="20" step="0.5" value="${it.lw}" style="width:52px"></div><div class="row"><button id="g_add" class="${G.pm=='add'?'on':''}">＋ポイント追加</button><button id="g_dp" class="${G.pm=='del'?'on':''}">－ポイント削除</button></div><div class="row">文字<textarea id="g_tx" rows="2" style="width:150px">${esc(it.txt||'')}</textarea></div><div class="row">サイズ<input id="g_tfs" type="range" min="4" max="300" value="${it.tfs||13}" style="width:100px"><input id="g_tfn" type="number" min="4" max="600" value="${it.tfs||13}" style="width:52px"><input type="color" id="g_tc" value="${it.tc||'#111111'}"><label><input type="checkbox" id="g_tb" ${it.tbo!==false?'checked':''}>太字</label><button id="g_tr0">位置リセット</button></div><div class="small">頂点●ドラッグ:変形 ／ 辺の中点の小さな●をドラッグ:点を追加 ／ 辺上ダブルクリック:点を追加 ／ 頂点を右クリック(またはダブルクリック):削除 ／ 本体ドラッグ:移動</div>`+dupb;
   const set=(k,v)=>{it[k]=v;GD[k]=v;draw()};q('#g_fill').onchange=e=>set('fill',e.target.checked);q('#g_fc').oninput=e=>set('fc',e.target.value);q('#g_tr').oninput=e=>{q('#g_trv').textContent=e.target.value+'%';set('fo',1-e.target.value/100)};q('#g_bd').onchange=e=>set('bd',e.target.checked);q('#g_sc').oninput=e=>set('sc',e.target.value);q('#g_lw').onchange=e=>set('lw',Math.max(.5,+e.target.value||2));
