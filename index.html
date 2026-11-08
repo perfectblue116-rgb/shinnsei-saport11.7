@@ -992,6 +992,7 @@ const say=(t,c)=>{st.textContent=t;st.className='small '+(c||'')};
 const nid=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 const fmtT=t=>{const d=new Date(t);return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
 const FLD=['csp'];
+window.siteApi={cur:()=>cur,get:k=>dbGet(k),set:(k,v)=>dbSet(k,v)};
 
 function snap(){return{v:1,saved:Date.now(),items:S.items,lines:S.lines,meas:S.meas,uid:S.uid,N:S.N,mpp:S.mpp,W:S.W,H:S.H,zoom:S.zoom,
  mode:S.pdfBytes?'pdf':(S.mapBg?'map':'blank'),bgId:S.mapBgId||0,pg:+g('pg').value||1,pdfName:S.pdfName||'',fld:Object.fromEntries(FLD.map(k=>[k,g(k).value]))}}
@@ -2373,6 +2374,7 @@ function jpegToPdf(jpg,w,h){const enc=s=>new TextEncoder().encode(s),parts=[],of
  const out=new Uint8Array(len);let p=0;for(const b of parts){out.set(b,p);p+=b.length}return out}
 function outJpg(){if(!posImgs||!posImgs.d){st('先に「詳細位置図」の枠をクリックして、地図から範囲を選んでください。','err');return}const c=sheetCanvas(3);c.toBlob(b=>dl(b,'位置図_'+ymd()+'.jpg'),'image/jpeg',.93)}
 function outPdf(){if(!posImgs||!posImgs.d){st('先に「詳細位置図」の枠をクリックして、地図から範囲を選んでください。','err');return}const c=sheetCanvas(3);c.toBlob(async b=>{const u=new Uint8Array(await b.arrayBuffer());dl(new Blob([jpegToPdf(u,c.width,c.height)],{type:'application/pdf'}),'位置図_'+ymd()+'.pdf')},'image/jpeg',.93)}
+window.rdSheetReady=()=>!!(posImgs&&posImgs.d);window.rdSheetCanvas=()=>(posImgs&&posImgs.d)?sheetCanvas(3):null;
 // ---- イベント
 q('#rdOpen').onclick=()=>openDlg('R');q('#rdOpenP').onclick=()=>openDlg('P');q('#rdOpenQ').onclick=()=>openDlg();
 q('#rdtabP').onclick=()=>gotoMode('P');q('#rdtabR').onclick=()=>gotoMode('R');
@@ -2528,5 +2530,285 @@ document.getElementById('qbar').addEventListener('click',e=>{const b=e.target.cl
 const apply=off=>{document.body.classList.toggle('qbar-off',off);b.textContent=off?'▼ ツールバーを表示':'▲ ツールバーを隠す';try{localStorage.setItem('kasetsu.qbarOff',off?'1':'0')}catch(e){}setTimeout(()=>window.dispatchEvent(new Event('resize')),30)};
 let off=false;try{off=localStorage.getItem('kasetsu.qbarOff')==='1'}catch(e){}
 apply(off);b.onclick=()=>apply(!document.body.classList.contains('qbar-off'));})();
+(function(){
+const NS='http://www.w3.org/2000/svg',$=s=>document.querySelector(s);
+// A4縦 (210x297mm) を 1mm=4unit で扱う
+const W=840,H=1188;
+const LAY={
+ 2:[{x:60,y:150,w:720,h:480},{x:60,y:660,w:720,h:480}],
+ 3:[{x:60,y:130,w:720,h:330},{x:60,y:480,w:720,h:330},{x:60,y:830,w:720,h:330}]};
+const DIRS=['北から撮影','南から撮影','東から撮影','西から撮影'];
+const eFr=()=>({img:null,sh:[],dir:''});
+const newPage=l=>({layout:l,fr:Array.from({length:l},eFr)});
+const newP=()=>({title:'● 現況写真',cur:0,pages:[newPage(2)]});
+let P=newP(),tool='sel',sel=null,mp=null,drag=null,col='#ef4444',op=.35,fs=22,pend=null,uid=1,cf=0;
+const pg=()=>P.pages[P.cur],FRM=()=>LAY[pg().layout],hasImg=p=>p.fr.some(d=>d.img);
+const css=`#phm{display:none;position:fixed;inset:0;z-index:12;background:var(--bg);flex-direction:column}
+#phm.on{display:flex}#phbar,#phbar2{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;background:var(--pn);border-bottom:1px solid var(--bd)}
+#phbar2{background:var(--ac2)}#phbar2 input[type=text]{width:170px}
+#phbar button,#phbar2 button{padding:4px 10px}#phbar button.on{background:var(--ac2);outline:2px solid #2563eb}
+#phbar button.dg:hover,#phbar2 button.dg:hover{background:#fee2e2;border-color:#f87171;color:#b91c1c}
+#phbar .sp{flex:1}#phmain{flex:1;overflow:auto;padding:10px;display:flex;justify-content:center;background:#9aa3ad}
+#phsv{background:#fff;box-shadow:0 2px 12px #0006;touch-action:none;max-width:100%;height:auto;width:min(100%,calc((100vh - 150px)*210/297));user-select:none;-webkit-user-select:none}
+#phsv *{user-select:none;-webkit-user-select:none}
+#phhint{font-size:12px;padding:3px 10px;background:#fff7d6;color:#78350f}
+#phpn{font-weight:700;min-width:54px;text-align:center}
+#phpr{display:none}
+@media print{body>*:not(#phm){display:none!important}#phm{position:static;display:block!important}#phbar,#phbar2,#phhint{display:none!important}#phmain{padding:0;background:#fff;overflow:visible;display:block}#phsv{display:none!important}#phpr{display:block}#phpr svg{display:block;width:210mm;height:297mm;page-break-after:always;break-after:page}#phpr svg:last-child{page-break-after:auto;break-after:auto}@page{size:A4 portrait;margin:0}}`;
+const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+const m=document.createElement('div');m.id='phm';
+m.innerHTML=`<div id="phbar"><b>📷 現況写真</b>
+<button data-t="sel" class="on">選択/移動</button><button data-t="poly">▱ 多角形塗り</button><button data-t="dim">↔ 寸法</button><button data-t="text">T 文字</button>
+<label>色 <input type="color" id="phcol" value="#ef4444"></label>
+<label>透過 <input type="range" id="phop" min="0" max="1" step=".05" value=".35" style="width:80px"></label>
+<label>文字 <input type="number" id="phfs" value="22" min="8" max="80" style="width:54px"></label>
+<button id="phdel">🗑 図形削除</button><button id="phrm" title="選んだ枠の写真を外す">写真を外す</button>
+<span class="sp"></span><button id="phpng">🖼 画像保存</button><button id="phpdf">📄 PDF保存(全ページ)</button><button id="phbp" title="位置図・規制図・現況写真をまとめて1つのPDFにします">📑 一括PDF</button><button id="phprt">🖨 印刷</button><button id="phx">✕ 閉じる</button></div>
+<div id="phbar2"><b>ページ</b>
+<button id="phpv" title="前のページ">◀</button><span id="phpn">1 / 1</span><button id="phnx" title="次のページ">▶</button>
+<button id="phadd">＋ ページ追加</button><button id="phpd" class="dg" title="表示中のページを削除">🗑 このページを削除</button>
+<label>配置 <select id="phly"><option value="2">1ページ2枚</option><option value="3">1ページ3枚</option></select></label>
+<span style="width:10px"></span><b>撮影方向</b><span class="small" id="phcf"></span>
+<select id="phdsel"><option value="">(選択して挿入)</option>${DIRS.map(d=>`<option>${d}</option>`).join('')}<option value="__none">(方角を消す)</option></select>
+<input type="text" id="phdir" placeholder="直接入力もできます" maxlength="30"></div>
+<div id="phhint"></div><div id="phmain"><svg id="phsv" viewBox="0 0 ${W} ${H}" xmlns="${NS}"></svg><div id="phpr"></div></div><input type="file" id="phf" accept="image/*" hidden>`;
+document.body.appendChild(m);
+const sv=$('#phsv'),hint=$('#phhint');
+const HINT={sel:'枠をタップして選択(青枠)。写真の無い枠はタップで画像を挿入。左上の方角ラベルをタップで編集。',poly:'写真上を順にタップして頂点指定、ダブルタップ(または最初の点付近タップ)で確定。',dim:'写真上で2点をタップ→寸法値を入力。',text:'写真上をタップして文字を入力。'};
+function setTool(t){tool=t;pend=null;m.querySelectorAll('[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t==t));hint.textContent=HINT[t];draw()}
+m.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>setTool(b.dataset.t));
+const E=(n,a,t)=>{let s='<'+n;for(const k in a)s+=` ${k}="${String(a[k]).replace(/"/g,'&quot;')}"`;return s+(t==null?'/>':'>'+t+'</'+n+'>')};
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function fit(fr,img){const r=Math.min(fr.w/img.w,fr.h/img.h);const w=img.w*r,h=img.h*r;return{x:fr.x+(fr.w-w)/2,y:fr.y+(fr.h-h)/2,w,h}}
+const tw=(t,f)=>{let w=0;for(const c of t)w+=c.charCodeAt(0)>255?f:f*.6;return w};
+function badge(x,y,t,i){const f=26,w=tw(t,f)+18;return `<g data-dir="${i}" style="cursor:pointer">`+E('rect',{x,y,width:w,height:40,fill:'#fff','fill-opacity':.93,stroke:'#111','stroke-width':1.5})+E('text',{x:x+9,y:y+29,'font-size':f,'font-weight':700,'font-family':'sans-serif',fill:'#111'},esc(t))+'</g>'}
+// 1ページ分のSVG中身。ui=trueで編集用表示(選択枠・案内文)、falseで出力用
+function pageInner(p,ui,pi){
+ const F=LAY[p.layout];
+ let h='<defs>'+F.map((f,i)=>`<clipPath id="phc${pi}_${i}"><rect x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}"/></clipPath>`).join('')+'</defs>';
+ h+=E('rect',{x:0,y:0,width:W,height:H,fill:'#fff'})+E('text',{x:60,y:96,'font-size':30,'font-weight':700,'font-family':'sans-serif','data-title':1,style:'cursor:pointer'},esc(P.title));
+ F.forEach((f,i)=>{const d=p.fr[i];h+=`<g data-fr="${i}">`+E('rect',{x:f.x,y:f.y,width:f.w,height:f.h,fill:'#fff',stroke:'#0b3a4a','stroke-width':3,'data-f':i});
+  let bx=f.x,by=f.y;
+  if(!d.img){if(ui)h+=E('text',{x:f.x+f.w/2,y:f.y+f.h/2,'text-anchor':'middle','font-size':26,fill:'#9aa3ad','font-family':'sans-serif','pointer-events':'none'},'タップして写真を挿入')}
+  else{const b=fit(f,d.img);bx=b.x;by=b.y;h+=E('image',{href:d.img.src,x:b.x,y:b.y,width:b.w,height:b.h,preserveAspectRatio:'none','data-f':i})}
+  h+=`<g clip-path="url(#phc${pi}_${i})">`;
+  for(const s of d.sh){const on=ui&&sel&&sel.s===s;
+   if(s.k=='poly'){h+=E('polygon',{points:s.p.map(q=>q.join(',')).join(' '),fill:s.c,'fill-opacity':s.o,stroke:s.c,'stroke-width':on?4:2,'data-s':s.id,style:'cursor:move'});
+    if(on)s.p.forEach((q,j)=>h+=E('circle',{cx:q[0],cy:q[1],r:9,fill:'#fff',stroke:'#2563eb','stroke-width':2,'data-v':j,'data-s':s.id,style:'cursor:crosshair'}))}
+   else if(s.k=='dim'){const[a,b]=s.p,dx=b[0]-a[0],dy=b[1]-a[1],L=Math.hypot(dx,dy)||1,nx=-dy/L*10,ny=dx/L*10,ang=Math.atan2(dy,dx)*180/Math.PI,mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2,rot=(ang>90||ang<-90)?ang+180:ang;
+    h+=`<g data-s="${s.id}" style="cursor:move" stroke="${s.c}" fill="${s.c}">`+E('line',{x1:a[0],y1:a[1],x2:b[0],y2:b[1],'stroke-width':on?4:2.5})+E('line',{x1:a[0]-nx,y1:a[1]-ny,x2:a[0]+nx,y2:a[1]+ny,'stroke-width':2.5})+E('line',{x1:b[0]-nx,y1:b[1]-ny,x2:b[0]+nx,y2:b[1]+ny,'stroke-width':2.5})
+     +E('polygon',{points:`${a[0]},${a[1]} ${a[0]+dx/L*14-dy/L*5},${a[1]+dy/L*14+dx/L*5} ${a[0]+dx/L*14+dy/L*5},${a[1]+dy/L*14-dx/L*5}`,stroke:'none'})
+     +E('polygon',{points:`${b[0]},${b[1]} ${b[0]-dx/L*14-dy/L*5},${b[1]-dy/L*14+dx/L*5} ${b[0]-dx/L*14+dy/L*5},${b[1]-dy/L*14-dx/L*5}`,stroke:'none'})
+     +E('text',{x:mx,y:my-6,transform:`rotate(${rot} ${mx} ${my})`,'text-anchor':'middle','font-size':s.fs,'font-weight':700,'font-family':'sans-serif',stroke:'#fff','stroke-width':5,'paint-order':'stroke',fill:s.c},esc(s.t))+'</g>';
+    if(on)s.p.forEach((q,j)=>h+=E('circle',{cx:q[0],cy:q[1],r:9,fill:'#fff',stroke:'#2563eb','stroke-width':2,'data-v':j,'data-s':s.id,style:'cursor:crosshair'}))}
+   else if(s.k=='text'){h+=E('text',{x:s.p[0][0],y:s.p[0][1],'font-size':s.fs,'font-weight':700,'font-family':'sans-serif',stroke:'#fff','stroke-width':5,'paint-order':'stroke',fill:s.c,'data-s':s.id,style:'cursor:move'},esc(s.t));
+    if(on)h+=E('circle',{cx:s.p[0][0],cy:s.p[0][1],r:6,fill:'#2563eb'})}
+  }
+  h+='</g>';
+  if(d.dir)h+=badge(bx,by,d.dir,i);   // 画像左上に撮影方向
+  if(ui&&i===cf)h+=E('rect',{x:f.x-2,y:f.y-2,width:f.w+4,height:f.h+4,fill:'none',stroke:'#2563eb','stroke-width':5,'pointer-events':'none'});
+  h+='</g>'});
+ return h}
+function draw(){
+ let h=pageInner(pg(),true,P.cur);
+ if(pend){if(pend.k=='poly'){h+=E('polyline',{points:pend.p.concat(mp?[mp]:[]).map(q=>q.join(',')).join(' '),fill:'none',stroke:col,'stroke-width':3,'stroke-dasharray':'8 5'});pend.p.forEach((q,j)=>h+=E('circle',{cx:q[0],cy:q[1],r:j?6:10,fill:j?col:'#fff',stroke:col,'stroke-width':2}))}
+  else if(pend.k=='dim'){h+=E('circle',{cx:pend.p[0][0],cy:pend.p[0][1],r:7,fill:col});if(mp)h+=E('line',{x1:pend.p[0][0],y1:pend.p[0][1],x2:mp[0],y2:mp[1],stroke:col,'stroke-width':2.5,'stroke-dasharray':'8 5'})}}
+ sv.innerHTML=h}
+function syncBar(){
+ $('#phpn').textContent=(P.cur+1)+' / '+P.pages.length;$('#phly').value=pg().layout;
+ const d=pg().fr[cf]||pg().fr[0];$('#phdir').value=d.dir||'';$('#phdsel').value=DIRS.includes(d.dir)?d.dir:'';
+ $('#phcf').textContent='(対象:枠'+(cf+1)+')';
+ $('#phpv').disabled=P.cur<=0;$('#phnx').disabled=P.cur>=P.pages.length-1}
+const pt=e=>{const r=sv.getBoundingClientRect();return[(e.clientX-r.left)/r.width*W,(e.clientY-r.top)/r.height*H]};
+const frOf=p=>FRM().findIndex(f=>p[0]>=f.x&&p[0]<=f.x+f.w&&p[1]>=f.y&&p[1]<=f.y+f.h);
+const find=id=>{const fr=pg().fr;for(let i=0;i<fr.length;i++){const s=fr[i].sh.find(x=>x.id==id);if(s)return{s,i}}return null};
+function pickImg(i){pend=null;m._fi=i;$('#phf').value='';$('#phf').click()}
+$('#phf').onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{
+  // 長辺1600pxに縮小して保存容量を抑える
+  const k=Math.min(1,1600/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+  const d=pg().fr[m._fi];d.img={src:c.toDataURL('image/jpeg',.88),w:c.width,h:c.height};d.sh=[];cf=m._fi;draw();syncBar();persist()};im.src=rd.result};rd.readAsDataURL(f)};
+let lastTap=0;
+sv.addEventListener('pointerdown',e=>{
+ const p=pt(e),t=e.target,i=frOf(p);
+ if(t.dataset&&t.dataset.title!=null){const v=prompt('見出し',P.title);if(v!=null){P.title=v;draw();persist()}return}
+ const bd=t.closest&&t.closest('[data-dir]');
+ if(bd&&tool=='sel'){const k=+bd.dataset.dir;cf=k;const v=prompt('撮影方向(例:北から撮影)',pg().fr[k].dir||'');if(v!=null){pg().fr[k].dir=v.trim();persist()}draw();syncBar();return}
+ if(i>=0&&i!==cf&&!pend){cf=i;syncBar()}
+ if(tool=='sel'){
+  const sid=t.dataset&&t.dataset.s;
+  if(sid){const r=find(sid);sel=r;cf=r.i;if(t.dataset.v!=null)drag={r,v:+t.dataset.v};else drag={r,p0:p,o:JSON.parse(JSON.stringify(r.s.p))};sv.setPointerCapture(e.pointerId);draw();syncBar();syncUI();return}
+  sel=null;draw();syncUI();
+  if(i>=0&&!pg().fr[i].img){pickImg(i)}
+  return}
+ if(i<0||!pg().fr[i].img){if(i>=0)pickImg(i);return}
+ const d=pg().fr[i];
+ if(tool=='poly'){
+  const now=Date.now();
+  if(!pend)pend={k:'poly',i,p:[p]};
+  else{if(pend.i!=i)return;const f0=pend.p[0];
+   if((pend.p.length>=3&&Math.hypot(p[0]-f0[0],p[1]-f0[1])<16)||(now-lastTap<350&&pend.p.length>=3)){finishPoly();return}
+   pend.p.push(p)}
+  lastTap=now;draw();return}
+ if(tool=='dim'){
+  if(!pend)pend={k:'dim',i,p:[p]};
+  else if(pend.i==i){const a=pend.p[0],len=Math.round(Math.hypot(p[0]-a[0],p[1]-a[1]));if(len<6){return}const v=prompt('寸法値(例: 3,500 / 3.5m)','');pend=null;if(v==null){draw();return}
+   const s={id:uid++,k:'dim',p:[a,p],t:v,c:col,fs};d.sh.push(s);sel={s,i};persist()}
+  draw();return}
+ if(tool=='text'){const v=prompt('文字を入力','');if(v){const s={id:uid++,k:'text',p:[p],t:v,c:col,fs};d.sh.push(s);sel={s,i};persist()}draw();return}
+});
+function finishPoly(){if(pend&&pend.p.length>=3){const s={id:uid++,k:'poly',p:pend.p.slice(),c:col,o:op};pg().fr[pend.i].sh.push(s);sel={s,i:pend.i};persist()}pend=null;draw()}
+sv.addEventListener('dblclick',e=>{if(tool=='poly'&&pend){if(pend.p.length>3)pend.p.pop();finishPoly();return}
+ const sid=e.target.dataset&&e.target.dataset.s;if(sid){const r=find(sid);if(r&&r.s.t!=null){const v=prompt('文字を編集',r.s.t);if(v!=null){r.s.t=v;draw();persist()}}}});
+sv.addEventListener('pointermove',e=>{const p=pt(e);
+ if(drag){const s=drag.r.s;if(drag.v!=null){s.p[drag.v]=p}else{const dx=p[0]-drag.p0[0],dy=p[1]-drag.p0[1];s.p=drag.o.map(q=>[q[0]+dx,q[1]+dy])}draw();return}
+ if(pend){mp=p;draw()}});
+sv.addEventListener('pointerup',()=>{if(drag){drag=null;persist()}});
+function syncUI(){if(sel){$('#phcol').value=sel.s.c;if(sel.s.o!=null)$('#phop').value=sel.s.o;if(sel.s.fs)$('#phfs').value=sel.s.fs;col=sel.s.c}}
+$('#phcol').oninput=e=>{col=e.target.value;if(sel){sel.s.c=col;draw();persist()}};
+$('#phop').oninput=e=>{op=+e.target.value;if(sel&&sel.s.o!=null){sel.s.o=op;draw();persist()}};
+$('#phfs').oninput=e=>{fs=+e.target.value||22;if(sel&&sel.s.fs){sel.s.fs=fs;draw();persist()}};
+function delSel(){if(!sel)return;const a=pg().fr[sel.i].sh,k=a.indexOf(sel.s);if(k>=0)a.splice(k,1);sel=null;draw();persist()}
+$('#phdel').onclick=delSel;
+$('#phrm').onclick=()=>{const d=pg().fr[cf];if(!d||!d.img){alert('枠'+(cf+1)+'には写真がありません。');return}if(confirm('枠'+(cf+1)+'の写真と図形を消します。よろしいですか?')){d.img=null;d.sh=[];sel=null;draw();persist()}};
+// ---- 撮影方向
+function setDir(v){const d=pg().fr[cf];if(!d)return;d.dir=v;draw();syncBar();persist()}
+$('#phdsel').onchange=e=>{const v=e.target.value;if(!v)return;setDir(v=='__none'?'':v)};
+$('#phdir').oninput=e=>{const d=pg().fr[cf];if(!d)return;d.dir=e.target.value;draw();$('#phdsel').value=DIRS.includes(d.dir)?d.dir:'';persist()};
+// ---- ページ操作(追加・削除・移動)・配置切替
+function goPage(n){P.cur=Math.max(0,Math.min(P.pages.length-1,n));cf=0;sel=null;pend=null;draw();syncBar();persist()}
+$('#phpv').onclick=()=>goPage(P.cur-1);$('#phnx').onclick=()=>goPage(P.cur+1);
+$('#phadd').onclick=()=>{P.pages.push(newPage(pg().layout));goPage(P.pages.length-1)};
+$('#phpd').onclick=()=>{
+ if(P.pages.length<=1){if(confirm('最後の1ページです。このページの写真・図形をすべて消去しますか?')){P.pages[0]=newPage(pg().layout);cf=0;sel=null;pend=null;draw();syncBar();persist()}return}
+ if(!confirm((P.cur+1)+'ページ目を削除します。写真・図形も消えます。よろしいですか?'))return;
+ P.pages.splice(P.cur,1);goPage(Math.min(P.cur,P.pages.length-1))};
+function setLayout(n){const p=pg();if(n==p.layout)return;
+ if(n<p.layout&&p.fr.slice(n).some(d=>d.img||d.sh.length)&&!confirm('枠'+(n+1)+'以降の写真・図形が消えます。よろしいですか?')){$('#phly').value=p.layout;return}
+ const OF=LAY[p.layout],NF=LAY[n],nfr=Array.from({length:n},(_,i)=>p.fr[i]||eFr());
+ nfr.forEach((d,i)=>{if(i>=OF.length||!d.img||!d.sh.length)return;const ob=fit(OF[i],d.img),nb=fit(NF[i],d.img);
+  d.sh.forEach(s=>{s.p=s.p.map(q=>[nb.x+(q[0]-ob.x)/ob.w*nb.w,nb.y+(q[1]-ob.y)/ob.h*nb.h])})});
+ p.fr=nfr;p.layout=n;cf=Math.min(cf,n-1);sel=null;pend=null;draw();syncBar();persist()}
+$('#phly').onchange=e=>setLayout(+e.target.value);
+document.addEventListener('keydown',e=>{if(!m.classList.contains('on'))return;if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
+ if(e.key=='Delete'||e.key=='Backspace'){delSel();e.preventDefault()}else if(e.key=='Escape'){if(pend){pend=null;draw()}else setTool('sel')}else if(e.key=='Enter'&&pend&&pend.k=='poly')finishPoly()});
+// ---- 出力(全ページ)
+function pageSvgStr(pi,K){return `<svg xmlns="${NS}" viewBox="0 0 ${W} ${H}" width="${W*K}" height="${H*K}">`+pageInner(P.pages[pi],false,pi)+'</svg>'}
+function pageCanvas(pi,K){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=W*K;c.height=H*K;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);res(c)};im.onerror=()=>rej(new Error('画像化に失敗'));im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(pageSvgStr(pi,K))})}
+async function ensureLoaded(){if(!m.classList.contains('on'))await restore()}
+window.genkyoPhotoInfo=async()=>{await ensureLoaded();return P.pages.filter(hasImg).length};
+window.genkyoPhotoCanvases=async K=>{await ensureLoaded();const out=[];for(let i=0;i<P.pages.length;i++)if(hasImg(P.pages[i]))out.push(await pageCanvas(i,K||2));return out};
+const ymd=()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')};
+$('#phpng').onclick=async()=>{try{const c=await pageCanvas(P.cur,2);c.toBlob(b=>window.__dlBlob(b,'現況写真_p'+(P.cur+1)+'.png'))}catch(e){alert('画像化に失敗しました')}};
+$('#phpdf').onclick=async()=>{try{const cs=await window.genkyoPhotoCanvases(2);if(!cs.length){alert('写真が入っているページがありません。');return}
+ const b=await window.__pdfMake(cs.map(c=>({c,pw:595.28,ph:841.89})));window.__dlBlob(b,'現況写真_'+ymd()+'.pdf')}catch(e){alert('PDF作成に失敗しました')}};
+$('#phbp').onclick=()=>{persistNow();window.openBatchPdf&&window.openBatchPdf()};
+$('#phprt').onclick=()=>{sel=null;pend=null;draw();const box=$('#phpr');box.innerHTML=P.pages.map((p,i)=>hasImg(p)||P.pages.length==1?pageSvgStr(i,1):'').join('');
+ const clean=()=>{box.innerHTML='';window.removeEventListener('afterprint',clean)};window.addEventListener('afterprint',clean);window.print()};
+$('#phx').onclick=()=>{m.classList.remove('on');persistNow()};
+// ---- 保存(現場ごと)
+let pt0=0;
+function saveNow(){try{const a=window.siteApi;if(a&&a.cur())a.set('ph:'+a.cur(),{P,uid})}catch(e){}}
+function persist(){clearTimeout(pt0);pt0=setTimeout(saveNow,300)}
+function persistNow(){clearTimeout(pt0);saveNow()}
+async function restore(){P=newP();uid=1;cf=0;try{const a=window.siteApi;if(a&&a.cur()){const d=await a.get('ph:'+a.cur());if(d&&d.P){let q=d.P;
+  if(!q.pages)q={title:q.title||'● 現況写真',cur:0,pages:[{layout:2,fr:(q.fr||[]).map(f=>({img:f.img||null,sh:f.sh||[],dir:f.dir||''}))}]};
+  if(!q.pages.length)q.pages=[newPage(2)];
+  q.pages.forEach(p=>{p.layout=p.layout==3?3:2;p.fr=p.fr||[];while(p.fr.length<p.layout)p.fr.push(eFr());p.fr.length=p.layout;p.fr.forEach(f=>{f.sh=f.sh||[];f.dir=f.dir||''})});
+  q.cur=Math.min(q.cur||0,q.pages.length-1);P=q;uid=d.uid||1}}}catch(e){}}
+async function open(){await restore();sel=null;pend=null;m.classList.add('on');setTool('sel');syncBar()}
+window.openGenkyoPhoto=open;
+// ボタンを上部ツールバー「図面作成」グループへ
+const host=$('#rdOpenQ')&&$('#rdOpenQ').parentNode;
+if(host){const b=document.createElement('button');b.id='phOpenQ';b.title='現況写真(写真添付資料)を作成';b.textContent='📷 現況状況(写真)';b.onclick=open;host.appendChild(b)}
+})();
+</script>
+<script>
+// ===== 一括PDF出力(位置図・規制図・現況写真をまとめて1つのPDFへ) =====
+(function(){
+const q=s=>document.querySelector(s);
+const ymd=()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')};
+window.__dlBlob=(blob,name)=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),8000)};
+const toJpeg=(c,ql)=>new Promise((res,rej)=>c.toBlob(async b=>{if(!b)return rej(new Error('jpeg'));res(new Uint8Array(await b.arrayBuffer()))},'image/jpeg',ql||.92));
+// pages:[{jpg,w,h,pw,ph}] → 複数ページPDF(各ページに画像1枚)
+function buildPdf(pages){
+ const enc=s=>new TextEncoder().encode(s),parts=[],offs=[];let len=0;const push=b=>{parts.push(b);len+=b.length};
+ const n=pages.length,total=2+3*n;
+ push(enc('%PDF-1.4\n'));
+ const obj=(k,body)=>{offs[k]=len;push(enc(k+' 0 obj\n'+body+'\nendobj\n'))};
+ obj(1,'<< /Type /Catalog /Pages 2 0 R >>');
+ obj(2,'<< /Type /Pages /Kids ['+pages.map((_,i)=>(3+3*i)+' 0 R').join(' ')+'] /Count '+n+' >>');
+ pages.forEach((p,i)=>{const pk=3+3*i,ik=4+3*i,ck=5+3*i;
+  obj(pk,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+p.pw+' '+p.ph+'] /Resources << /XObject << /Im0 '+ik+' 0 R >> >> /Contents '+ck+' 0 R >>');
+  offs[ik]=len;push(enc(ik+' 0 obj\n<< /Type /XObject /Subtype /Image /Width '+p.w+' /Height '+p.h+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+p.jpg.length+' >>\nstream\n'));push(p.jpg);push(enc('\nendstream\nendobj\n'));
+  const cs='q '+p.pw+' 0 0 '+p.ph+' 0 0 cm /Im0 Do Q';obj(ck,'<< /Length '+cs.length+' >>\nstream\n'+cs+'\nendstream')});
+ const xr=len;let t='xref\n0 '+(total+1)+'\n0000000000 65535 f \n';for(let k=1;k<=total;k++)t+=String(offs[k]).padStart(10,'0')+' 00000 n \n';
+ push(enc(t+'trailer\n<< /Size '+(total+1)+' /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF'));
+ const out=new Uint8Array(len);let o=0;for(const b of parts){out.set(b,o);o+=b.length}return out}
+// items:[{c:canvas,pw,ph}] → Blob
+window.__pdfMake=async items=>{const pg=[];for(const it of items)pg.push({jpg:await toJpeg(it.c),w:it.c.width,h:it.c.height,pw:it.pw.toFixed(2),ph:it.ph.toFixed(2)});return new Blob([buildPdf(pg)],{type:'application/pdf'})};
+// 規制図(作図画面)をキャンバス化(「画像で表示」と同じ方法)
+function mainCanvas(){return new Promise((res,rej)=>{
+ try{annEditEnd();draw(false)}catch(e){}
+ const k=cv.width/S.W,x=new XMLSerializer().serializeToString(sv).replace(/^(<svg[^>]*>)/,m=>m+document.querySelector('#defs defs').outerHTML),im=new Image();
+ const back=()=>{try{draw()}catch(e){}};
+ im.onload=()=>{const c=document.createElement('canvas');c.width=cv.width;c.height=cv.height;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(cv,0,0);g.drawImage(im,0,0,c.width,c.height);back();res(c)};
+ im.onerror=()=>{back();rej(new Error('規制図の画像化に失敗'))};
+ im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x.replace('<svg','<svg width="'+S.W*k+'" height="'+S.H*k+'"'))})}
+const mainReady=()=>!!(S.items.length||S.lines.length||S.pdfBytes||S.mapBg);
+// ---- ダイアログ
+const css=`#bpm{display:none;position:fixed;inset:0;z-index:30;background:#000a;align-items:center;justify-content:center;padding:14px}
+#bpm.on{display:flex}#bpc{background:var(--pn);color:var(--tx);border-radius:12px;padding:16px 18px;width:min(460px,100%);box-shadow:0 8px 30px #0008;max-height:92vh;overflow:auto}
+#bpc h3{margin:0 0 4px;font-size:16px}#bpc .bpr{display:flex;align-items:flex-start;gap:8px;padding:8px 6px;border-bottom:1px solid var(--bd)}
+#bpc .bpr label{flex:1;cursor:pointer}#bpc .bpr b{display:block}#bpc .bpr span{font-size:11px;color:var(--mu)}#bpc .bpr span.ok{color:#15803d}#bpc .bpr span.no{color:#b45309}
+#bpc input[type=checkbox]{width:18px;height:18px;margin-top:2px}#bpc .bpf{display:flex;gap:6px;align-items:center;margin:10px 0 4px}#bpc .bpf input{flex:1;min-width:0}
+#bpst{min-height:18px;font-size:12px;color:var(--mu);margin:6px 0}#bpst.err{color:#c0392b}#bpst.ok{color:#15803d}
+#bpc .bpb{display:flex;gap:8px;justify-content:flex-end}#bpc .bpb button{padding:7px 16px}#bpgo{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:700}`;
+const stl=document.createElement('style');stl.textContent=css;document.head.appendChild(stl);
+const box=document.createElement('div');box.id='bpm';
+box.innerHTML=`<div id="bpc"><h3>📑 一括PDF出力</h3><div class="small">チェックした書類を、下の順番で1つのPDFにまとめます。</div>
+<div class="bpr"><input type="checkbox" id="bpP"><label for="bpP"><b>① 位置図(付近見取図)</b><span id="bpPs"></span></label></div>
+<div class="bpr"><input type="checkbox" id="bpR"><label for="bpR"><b>② 規制図(道路使用図・作図画面)</b><span id="bpRs"></span></label></div>
+<div class="bpr"><input type="checkbox" id="bpH"><label for="bpH"><b>③ 現況写真(全ページ)</b><span id="bpHs"></span></label></div>
+<div class="bpf"><span class="small">ファイル名</span><input type="text" id="bpn"></div>
+<div id="bpst"></div><div class="bpb"><button id="bpx">閉じる</button><button id="bpgo">PDFを作成</button></div></div>`;
+document.body.appendChild(box);
+const say=(t,c)=>{const e=q('#bpst');e.textContent=t||'';e.className=c||''};
+function setS(id,t,ok){const e=q(id);e.textContent=t;e.className=ok?'ok':'no'}
+async function openBatch(){
+ box.classList.add('on');say('');
+ const pr=!!(window.rdSheetReady&&window.rdSheetReady());
+ q('#bpP').checked=pr;q('#bpP').disabled=!pr;setS('#bpPs',pr?'作成済み(A4縦)':'未作成:「位置図を作成」で範囲を選ぶと含められます',pr);
+ const mr=mainReady();q('#bpR').checked=mr;q('#bpR').disabled=!mr;setS('#bpRs',mr?'作図あり('+(S.W>S.H?'横':'縦')+'向き '+Math.round(S.W/2.8346)+'×'+Math.round(S.H/2.8346)+'mm)':'未作成(下図・仮設物がありません)',mr);
+ setS('#bpHs','確認中…',false);q('#bpH').disabled=true;q('#bpH').checked=false;
+ let n=0;try{n=await window.genkyoPhotoInfo()}catch(e){}
+ q('#bpH').disabled=!n;q('#bpH').checked=n>0;setS('#bpHs',n?'写真入りページ '+n+' 枚(A4縦)':'写真がありません(「現況状況(写真)」で作成)',n>0);
+ const site=((q('#qsite').textContent||'').replace(/^現場:\s*/,'').trim()||'申請書類').replace(/[\\/:*?"<>|]/g,'_');
+ q('#bpn').value='申請書類_'+site+'_'+ymd()+'.pdf'}
+window.openBatchPdf=openBatch;
+q('#bpx').onclick=()=>box.classList.remove('on');
+box.addEventListener('pointerdown',e=>{if(e.target===box)box.classList.remove('on')});
+let busy=false;
+q('#bpgo').onclick=async()=>{
+ if(busy)return;
+ const wantP=q('#bpP').checked,wantR=q('#bpR').checked,wantH=q('#bpH').checked;
+ if(!wantP&&!wantR&&!wantH){say('出力する書類にチェックを入れてください。','err');return}
+ busy=true;q('#bpgo').disabled=true;const items=[];
+ try{
+  if(wantP){say('位置図を作成中…');const c=window.rdSheetCanvas&&window.rdSheetCanvas();if(c)items.push({c,pw:595.28,ph:841.89})}
+  if(wantR){say('規制図を作成中…');const c=await mainCanvas();items.push({c,pw:S.W,ph:S.H})}
+  if(wantH){say('現況写真を作成中…');const cs=await window.genkyoPhotoCanvases(2);cs.forEach(c=>items.push({c,pw:595.28,ph:841.89}))}
+  if(!items.length)throw new Error('出力できるページがありません');
+  say('PDFにまとめています…('+items.length+'ページ)');
+  const b=await window.__pdfMake(items);
+  let nm=(q('#bpn').value||'').trim()||('申請書類_'+ymd()+'.pdf');if(!/\.pdf$/i.test(nm))nm+='.pdf';
+  window.__dlBlob(b,nm);say('PDFを出力しました('+items.length+'ページ / '+(b.size/1048576).toFixed(1)+'MB)。','ok')
+ }catch(e){say('出力に失敗しました:'+(e.message||e),'err')}
+ busy=false;q('#bpgo').disabled=false};
+// ---- ボタン設置(上部ツールバー「出力」・左パネル「出力・表示」)
+const prtQ=document.querySelector('#qbar [data-q="prt"]');
+if(prtQ){const b=document.createElement('button');b.id='bpdfQ';b.title='位置図・規制図・現況写真をまとめて1つのPDFに出力';b.textContent='📑 一括PDF';b.onclick=openBatch;prtQ.parentNode.appendChild(b)}
+const prtS=document.getElementById('prt');
+if(prtS){const b=document.createElement('button');b.id='bpdfS';b.textContent='📑 一括PDF出力';b.style.fontWeight='700';b.onclick=openBatch;const r=document.createElement('div');r.className='row';r.appendChild(b);prtS.parentNode.insertAdjacentElement('afterend',r)}
+})();
 </script>
 </body></html>
