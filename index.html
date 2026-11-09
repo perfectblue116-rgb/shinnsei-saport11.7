@@ -1276,6 +1276,13 @@ document.getElementById('rvPaste').onclick=function(){
   if(!navigator.clipboard||!navigator.clipboard.readText){msg('この環境では自動取込できません。入力欄に貼り付けてください');inp.focus();return}
   navigator.clipboard.readText().then(function(t){t=(t||'').trim();if(!t){msg('クリップボードが空です');return}inp.value=t;inp.select();return copy(t)},function(){msg('クリップボードの読取が許可されていません。入力欄に貼り付けてください');inp.focus()});
 };
+// 改造版の道路閲覧検索マップ(路線クリックでコピー)から届く通知を受け取り、入力欄へ反映
+window.addEventListener('message',function(e){
+  var o;try{o=new URL(URL_RV).origin}catch(x){return}
+  if(e.origin!==o||!e.data||e.data.type!=='road-route-copied')return;
+  inp.value=String(e.data.text||'');
+  msg('コピーしました:'+inp.value+'(貼り付けたい場所でペースト)',true);
+});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&m.classList.contains('on')){close_();e.stopPropagation()}},true);
 })();
 </script>
